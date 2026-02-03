@@ -1944,7 +1944,12 @@ function sendBrowserNotification(title, body) {
 
 function requestNotificationPermission() {
   if(!('Notification' in window)) {
-    alert('Browser notifications not supported');
+    alert('Browser notifications are not supported on this device.\n\nOn iPhone, add this app to your home screen first.');
+    return;
+  }
+
+  if(Notification.permission === 'denied') {
+    alert('Notifications are blocked.\n\nTo enable them, go to your browser settings and allow notifications for this site.');
     return;
   }
 
@@ -1953,7 +1958,14 @@ function requestNotificationPermission() {
       alertCfg.notifications = true;
       saveAlertCfg(alertCfg);
       updateAlertToggles();
+      // Show success
+      new Notification('Notifications Enabled', { body: 'You will receive alerts when power issues occur.', icon: 'icon-192.png' });
+    } else if(permission === 'denied') {
+      alert('Notifications were denied. You can change this in browser settings.');
     }
+  }).catch(err => {
+    console.error('Notification permission error:', err);
+    alert('Could not request notification permission. Try adding this app to your home screen.');
   });
 }
 
