@@ -2174,6 +2174,124 @@ function resizeCanvas() {
 
 window.addEventListener('resize', resizeCanvas);
 
+// Graph hover state
+let hoverX = null;
+let hoverDataIndex = null;
+
+// Graph tooltip element (created dynamically)
+const graphTooltip = document.createElement('div');
+graphTooltip.id = 'graphTooltip';
+graphTooltip.style.cssText = `
+  position: absolute;
+  background: rgba(13, 15, 20, 0.95);
+  border: 1px solid #e8a033;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: #d4d8e4;
+  pointer-events: none;
+  z-index: 100;
+  display: none;
+  min-width: 140px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+`;
+document.body.appendChild(graphTooltip);
+
+function handleGraphHover(clientX, clientY, isTouch) {
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  const pad = { top: 12, right: 12, bottom: 24, left: 50 };
+  const gW = cW - pad.left - pad.right;
+
+  // Check if within graph area
+  if (x < pad.left || x > cW - pad.right || powerHistory.length < 2) {
+    hideGraphTooltip();
+    return;
+  }
+
+  hoverX = x;
+
+  // Calculate which data point we're hovering over
+  const dx = gW / (HISTORY_LEN - 1);
+  const startIdx = HISTORY_LEN - powerHistory.length;
+  const dataIdx = Math.round((x - pad.left) / dx) - startIdx;
+
+  if (dataIdx < 0 || dataIdx >= powerHistory.length) {
+    hideGraphTooltip();
+    return;
+  }
+
+  hoverDataIndex = dataIdx;
+  const data = powerHistory[dataIdx];
+
+  // Update tooltip content
+  const time = new Date(data.time);
+  const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  graphTooltip.innerHTML = `
+    <div style="color:#6a7088;font-size:10px;margin-bottom:4px;">${timeStr}</div>
+    <div style="color:#e8a033;">Prod: ${data.prod.toFixed(1)} MW</div>
+    <div style="color:#3b9ddb;">Cons: ${data.cons.toFixed(1)} MW</div>
+    <div style="color:#d44a4a;">Max: ${data.max.toFixed(1)} MW</div>
+  `;
+
+  // Position tooltip
+  let tooltipX = clientX + 15;
+  let tooltipY = isTouch ? clientY - 100 : clientY - 10;
+
+  // Keep tooltip on screen
+  const tooltipRect = graphTooltip.getBoundingClientRect();
+  if (tooltipX + 160 > window.innerWidth) {
+    tooltipX = clientX - 160;
+  }
+  if (tooltipY < 10) {
+    tooltipY = clientY + 20;
+  }
+
+  graphTooltip.style.left = tooltipX + 'px';
+  graphTooltip.style.top = tooltipY + 'px';
+  graphTooltip.style.display = 'block';
+
+  drawGraph();
+}
+
+function hideGraphTooltip() {
+  hoverX = null;
+  hoverDataIndex = null;
+  graphTooltip.style.display = 'none';
+  drawGraph();
+}
+
+// Desktop mouse events
+canvas.addEventListener('mousemove', (e) => {
+  handleGraphHover(e.clientX, e.clientY, false);
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hideGraphTooltip();
+});
+
+// Mobile touch events
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  handleGraphHover(touch.clientX, touch.clientY, true);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  handleGraphHover(touch.clientX, touch.clientY, true);
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+  // Delay hiding on mobile so user can see the tooltip
+  setTimeout(hideGraphTooltip, 1500);
+});
+
 function drawGraph() {
   ctx.clearRect(0, 0, cW, cH);
 
@@ -2282,6 +2400,41 @@ function drawGraph() {
     ctx.fillStyle = col;
     ctx.fill();
   });
+
+  // Draw crosshair if hovering
+  if (hoverX !== null && hoverDataIndex !== null && hoverDataIndex >= 0 && hoverDataIndex < powerHistory.length) {
+    const data = powerHistory[hoverDataIndex];
+    const crossX = xPos(startIdx + hoverDataIndex);
+
+    // Vertical line
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(232, 160, 51, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.moveTo(crossX, pad.top);
+    ctx.lineTo(crossX, pad.top + gH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Highlight dots at hover position
+    [[data.prod, '#e8a033'], [data.cons, '#3b9ddb'], [data.max, '#d44a4a']].forEach(([val, col]) => {
+      // Outer glow
+      ctx.beginPath();
+      ctx.arc(crossX, yPos(val), 8, 0, Math.PI * 2);
+      ctx.fillStyle = col.replace(')', ', 0.3)').replace('rgb', 'rgba').replace('#', 'rgba(');
+      ctx.fillStyle = `${col}40`;
+      ctx.fill();
+
+      // Inner dot
+      ctx.beginPath();
+      ctx.arc(crossX, yPos(val), 5, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  }
 }
 
 // ============================================================
