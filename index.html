@@ -2289,8 +2289,16 @@ function submitPin() {
       }
     }
   } else {
-    // Join mode - verify PIN
-    if(verifyPin(currentPin)) {
+    // Join mode - save PIN locally (each device stores the shared PIN)
+    // If no PIN exists on this device, save it. If one exists, verify it matches.
+    if(!isPinSet()) {
+      // First time on this device - save the PIN they entered
+      savePin(currentPin);
+      setUnlocked();
+      closePinModal();
+      initDashboard();
+    } else if(verifyPin(currentPin)) {
+      // PIN exists and matches
       setUnlocked();
       closePinModal();
       if(window.location.hash.includes('pin=')) {
