@@ -2085,6 +2085,12 @@ async function api(endpoint) {
   return r.json();
 }
 
+function isMixedContentBlocked() {
+  return window.location.protocol === 'https:' &&
+         !cfg.host.includes('localhost') &&
+         !cfg.host.includes('127.0.0.1');
+}
+
 // ============================================================
 // TABS
 // ============================================================
@@ -2278,6 +2284,12 @@ function drawGraph() {
 // DATA FETCH
 // ============================================================
 async function poll() {
+  // Check for mixed content (HTTPS page can't fetch HTTP)
+  if(isMixedContentBlocked()) {
+    setConn(false, 'HTTPS_ERROR');
+    return;
+  }
+
   try {
     const [power, players, prodStats, trains, drones, session, sink, generators, switches, chat, factory] = await Promise.all([
       api('getPower').catch(() => null),
@@ -2310,9 +2322,26 @@ async function poll() {
   }
 }
 
-function setConn(ok) {
-  document.getElementById('connDot').className = ok ? 'conn-dot on' : 'conn-dot';
-  document.getElementById('connText').textContent = ok ? 'ONLINE' : 'OFFLINE';
+function setConn(ok, errorType) {
+  const dot = document.getElementById('connDot');
+  const text = document.getElementById('connText');
+  dot.className = ok ? 'conn-dot on' : 'conn-dot';
+
+  if(ok) {
+    text.textContent = 'ONLINE';
+  } else if(errorType === 'HTTPS_ERROR') {
+    text.textContent = 'BLOCKED';
+    text.title = 'HTTPS cannot connect to HTTP servers. Download and run index.html locally.';
+    // Show one-time alert
+    if(!window.httpsWarningShown) {
+      window.httpsWarningShown = true;
+      setTimeout(() => {
+        alert('⚠️ Connection Blocked\\n\\nThis HTTPS site cannot connect to your HTTP game server (browser security).\\n\\nTo fix this:\\n1. Download index.html from GitHub\\n2. Open it directly in your browser\\n3. Or run a local web server');
+      }, 500);
+    }
+  } else {
+    text.textContent = 'OFFLINE';
+  }
 }
 
 // --- POWER ---
