@@ -1178,9 +1178,17 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s;
+    transition: background 0.1s, border-color 0.1s, transform 0.1s;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+  }
+
+  .key-btn.pressed {
+    background: var(--ficsit-orange-mid);
+    border-color: var(--ficsit-orange);
+    transform: scale(0.92);
   }
 
   .key-btn:active {
@@ -1701,19 +1709,19 @@
       </div>
 
       <!-- Phone Keypad -->
-      <div class="phone-keypad">
-        <button class="key-btn" onclick="pressKey('1')"><span class="key-num">1</span><span class="key-letters">&nbsp;</span></button>
-        <button class="key-btn" onclick="pressKey('2')"><span class="key-num">2</span><span class="key-letters">ABC</span></button>
-        <button class="key-btn" onclick="pressKey('3')"><span class="key-num">3</span><span class="key-letters">DEF</span></button>
-        <button class="key-btn" onclick="pressKey('4')"><span class="key-num">4</span><span class="key-letters">GHI</span></button>
-        <button class="key-btn" onclick="pressKey('5')"><span class="key-num">5</span><span class="key-letters">JKL</span></button>
-        <button class="key-btn" onclick="pressKey('6')"><span class="key-num">6</span><span class="key-letters">MNO</span></button>
-        <button class="key-btn" onclick="pressKey('7')"><span class="key-num">7</span><span class="key-letters">PQRS</span></button>
-        <button class="key-btn" onclick="pressKey('8')"><span class="key-num">8</span><span class="key-letters">TUV</span></button>
-        <button class="key-btn" onclick="pressKey('9')"><span class="key-num">9</span><span class="key-letters">WXYZ</span></button>
-        <button class="key-btn key-fn" onclick="clearPin()"><span class="key-num">C</span><span class="key-letters">CLEAR</span></button>
-        <button class="key-btn" onclick="pressKey('0')"><span class="key-num">0</span><span class="key-letters">&nbsp;</span></button>
-        <button class="key-btn key-fn" onclick="backspace()"><span class="key-num">&#9003;</span><span class="key-letters">DEL</span></button>
+      <div class="phone-keypad" id="phoneKeypad">
+        <button class="key-btn" data-key="1"><span class="key-num">1</span><span class="key-letters">&nbsp;</span></button>
+        <button class="key-btn" data-key="2"><span class="key-num">2</span><span class="key-letters">ABC</span></button>
+        <button class="key-btn" data-key="3"><span class="key-num">3</span><span class="key-letters">DEF</span></button>
+        <button class="key-btn" data-key="4"><span class="key-num">4</span><span class="key-letters">GHI</span></button>
+        <button class="key-btn" data-key="5"><span class="key-num">5</span><span class="key-letters">JKL</span></button>
+        <button class="key-btn" data-key="6"><span class="key-num">6</span><span class="key-letters">MNO</span></button>
+        <button class="key-btn" data-key="7"><span class="key-num">7</span><span class="key-letters">PQRS</span></button>
+        <button class="key-btn" data-key="8"><span class="key-num">8</span><span class="key-letters">TUV</span></button>
+        <button class="key-btn" data-key="9"><span class="key-num">9</span><span class="key-letters">WXYZ</span></button>
+        <button class="key-btn key-fn" data-action="clear"><span class="key-num">C</span><span class="key-letters">CLEAR</span></button>
+        <button class="key-btn" data-key="0"><span class="key-num">0</span><span class="key-letters">&nbsp;</span></button>
+        <button class="key-btn key-fn" data-action="backspace"><span class="key-num">&#9003;</span><span class="key-letters">DEL</span></button>
       </div>
 
       <button class="btn-primary" onclick="submitPin()" id="pinSubmitBtn" style="width:100%; margin-top:16px;">Unlock</button>
@@ -1865,6 +1873,62 @@ function clearPin() {
   updatePinDots();
   document.getElementById('pinError').style.display = 'none';
 }
+
+// Touch-optimized keypad handler
+(function() {
+  const keypad = document.getElementById('phoneKeypad');
+  if (!keypad) return;
+
+  function handleKey(btn) {
+    const key = btn.dataset.key;
+    const action = btn.dataset.action;
+
+    if (key) {
+      pressKey(key);
+    } else if (action === 'clear') {
+      clearPin();
+    } else if (action === 'backspace') {
+      backspace();
+    }
+  }
+
+  // Touch events for instant response
+  keypad.addEventListener('touchstart', function(e) {
+    const btn = e.target.closest('.key-btn');
+    if (!btn) return;
+    e.preventDefault();
+    btn.classList.add('pressed');
+    handleKey(btn);
+  }, { passive: false });
+
+  keypad.addEventListener('touchend', function(e) {
+    const btn = e.target.closest('.key-btn');
+    if (btn) btn.classList.remove('pressed');
+  });
+
+  keypad.addEventListener('touchcancel', function(e) {
+    keypad.querySelectorAll('.key-btn').forEach(b => b.classList.remove('pressed'));
+  });
+
+  // Mouse fallback for desktop
+  keypad.addEventListener('mousedown', function(e) {
+    if ('ontouchstart' in window) return; // Skip on touch devices
+    const btn = e.target.closest('.key-btn');
+    if (!btn) return;
+    btn.classList.add('pressed');
+    handleKey(btn);
+  });
+
+  keypad.addEventListener('mouseup', function(e) {
+    if ('ontouchstart' in window) return;
+    const btn = e.target.closest('.key-btn');
+    if (btn) btn.classList.remove('pressed');
+  });
+
+  keypad.addEventListener('mouseleave', function() {
+    keypad.querySelectorAll('.key-btn').forEach(b => b.classList.remove('pressed'));
+  });
+})();
 
 function setPinMode(mode) {
   pinMode = mode;
