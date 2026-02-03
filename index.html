@@ -1432,6 +1432,101 @@
   @media (max-width: 767px) {
     .desktop-tabs { display: none !important; }
   }
+
+  /* === MAP STYLES === */
+  .map-container {
+    position: relative;
+    width: 100%;
+    height: 350px;
+    background: var(--bg-deep);
+    overflow: hidden;
+    touch-action: none;
+    cursor: grab;
+  }
+  .map-container:active { cursor: grabbing; }
+  .map-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .map-controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .map-layer-btn, .map-zoom-btn {
+    width: 32px;
+    height: 32px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .map-layer-btn:hover, .map-zoom-btn:hover {
+    border-color: var(--ficsit-orange);
+    color: var(--ficsit-orange);
+  }
+  .map-layer-btn.active {
+    background: rgba(232, 160, 51, 0.15);
+    border-color: var(--ficsit-orange);
+    color: var(--ficsit-orange);
+  }
+  .map-legend {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px;
+    font-size: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .map-popup {
+    position: absolute;
+    background: rgba(13, 15, 20, 0.95);
+    border: 1px solid var(--ficsit-orange);
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-width: 140px;
+    max-width: 220px;
+    pointer-events: none;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  .map-popup-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ficsit-orange);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .map-popup-content {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  @media (min-width: 768px) {
+    .map-container { height: 500px; }
+  }
 </style>
 </head>
 <body>
@@ -1478,6 +1573,7 @@
   <button class="desktop-tab" data-tab="systems">Systems</button>
   <button class="desktop-tab" data-tab="production">Production</button>
   <button class="desktop-tab" data-tab="overview">Overview</button>
+  <button class="desktop-tab" data-tab="map">Map</button>
 </div>
 
 <!-- CONTENT -->
@@ -1710,6 +1806,38 @@
     </div>
   </div>
 
+  <!-- MAP TAB -->
+  <div class="tab-content" id="tab-map">
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <div class="card-title">World Map</div>
+        <div class="map-controls">
+          <button class="map-layer-btn active" data-layer="generators" title="Generators">&#9889;</button>
+          <button class="map-layer-btn active" data-layer="players" title="Players">&#128100;</button>
+          <button class="map-layer-btn" data-layer="trains" title="Trains">&#128646;</button>
+          <button class="map-layer-btn" data-layer="drones" title="Drones">&#128681;</button>
+          <span style="width:1px; height:20px; background:var(--border); margin:0 4px;"></span>
+          <button class="map-zoom-btn" onclick="mapZoomIn()" title="Zoom In">+</button>
+          <button class="map-zoom-btn" onclick="mapZoomOut()" title="Zoom Out">-</button>
+          <button class="map-zoom-btn" onclick="mapReset()" title="Reset View">&#8634;</button>
+        </div>
+      </div>
+      <div class="map-container" id="mapContainer">
+        <canvas id="mapCanvas"></canvas>
+        <div class="map-popup" id="mapPopup" style="display: none;">
+          <div class="map-popup-title" id="mapPopupTitle"></div>
+          <div class="map-popup-content" id="mapPopupContent"></div>
+        </div>
+      </div>
+      <div class="map-legend">
+        <span class="legend-item"><span class="legend-dot" style="background: var(--green);"></span> Running</span>
+        <span class="legend-item"><span class="legend-dot" style="background: var(--ficsit-orange);"></span> Idle</span>
+        <span class="legend-item"><span class="legend-dot" style="background: var(--red);"></span> Empty</span>
+        <span class="legend-item"><span class="legend-dot" style="background: #3b9ddb;"></span> Players</span>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <!-- BOTTOM NAV (Mobile) -->
@@ -1729,6 +1857,10 @@
   <button class="nav-item" data-tab="overview">
     <span class="icon">&#127981;</span>
     <span class="label">Overview</span>
+  </button>
+  <button class="nav-item" data-tab="map">
+    <span class="icon">&#127758;</span>
+    <span class="label">Map</span>
   </button>
 </nav>
 
@@ -2435,6 +2567,467 @@ async function api(endpoint) {
 }
 
 // ============================================================
+// MAP SYSTEM
+// ============================================================
+const mapCanvas = document.getElementById('mapCanvas');
+const mapCtx = mapCanvas ? mapCanvas.getContext('2d') : null;
+let mapImage = null;
+let mapImageLoaded = false;
+
+// World coordinate bounds (Satisfactory map)
+const WORLD_BOUNDS = { minX: -400000, maxX: 400000, minY: -400000, maxY: 400000 };
+
+// Map view state
+const mapView = {
+  offsetX: 0, offsetY: 0,
+  zoom: 1, minZoom: 0.3, maxZoom: 5,
+  imageSize: 4096
+};
+
+// Visible layers
+const mapLayers = { generators: true, players: true, trains: false, drones: false };
+
+// Cached entity data for map
+let mapGenerators = [];
+let mapPlayers = [];
+let mapTrains = [];
+let mapDrones = [];
+
+// Interaction state
+let mapDragging = false;
+let mapLastPos = { x: 0, y: 0 };
+let pinchStartDist = null;
+let pinchStartZoom = null;
+
+function loadMapImage() {
+  mapImage = new Image();
+  mapImage.crossOrigin = 'anonymous';
+  mapImage.onload = () => {
+    mapImageLoaded = true;
+    mapView.imageSize = mapImage.width || 4096;
+    centerMap();
+    drawMap();
+  };
+  mapImage.onerror = () => {
+    console.warn('Map image failed to load, using grid');
+    mapImageLoaded = false;
+    drawMap();
+  };
+  // Use Satisfactory wiki map or fallback to grid
+  mapImage.src = 'https://static.wikia.nocookie.net/satisfactory_gamepedia_en/images/7/77/Map.png/revision/latest?cb=20230530153510';
+}
+
+function worldToCanvas(worldX, worldY) {
+  const nx = (worldX - WORLD_BOUNDS.minX) / (WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX);
+  const ny = (worldY - WORLD_BOUNDS.minY) / (WORLD_BOUNDS.maxY - WORLD_BOUNDS.minY);
+  const cx = (nx * mapView.imageSize - mapView.offsetX) * mapView.zoom;
+  const cy = ((1 - ny) * mapView.imageSize - mapView.offsetY) * mapView.zoom;
+  return { x: cx, y: cy };
+}
+
+function resizeMapCanvas() {
+  if (!mapCanvas) return;
+  const container = document.getElementById('mapContainer');
+  if (!container) return;
+  const dpr = window.devicePixelRatio || 1;
+  mapCanvas.width = container.clientWidth * dpr;
+  mapCanvas.height = container.clientHeight * dpr;
+  mapCtx.scale(dpr, dpr);
+  drawMap();
+}
+
+function centerMap() {
+  if (!mapCanvas) return;
+  const w = mapCanvas.width / (window.devicePixelRatio || 1);
+  const h = mapCanvas.height / (window.devicePixelRatio || 1);
+  mapView.offsetX = (mapView.imageSize - w / mapView.zoom) / 2;
+  mapView.offsetY = (mapView.imageSize - h / mapView.zoom) / 2;
+}
+
+function drawMap() {
+  if (!mapCtx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = mapCanvas.width / dpr;
+  const h = mapCanvas.height / dpr;
+
+  mapCtx.clearRect(0, 0, w, h);
+
+  if (mapImageLoaded && mapImage) {
+    const srcX = mapView.offsetX;
+    const srcY = mapView.offsetY;
+    const srcW = w / mapView.zoom;
+    const srcH = h / mapView.zoom;
+    mapCtx.drawImage(mapImage, srcX, srcY, srcW, srcH, 0, 0, w, h);
+  } else {
+    // Grid placeholder
+    mapCtx.fillStyle = '#1a1e2a';
+    mapCtx.fillRect(0, 0, w, h);
+    drawMapGrid(w, h);
+  }
+
+  // Draw entity markers
+  if (mapLayers.generators) drawGeneratorMarkers(w, h);
+  if (mapLayers.players) drawPlayerMarkers(w, h);
+  if (mapLayers.trains) drawTrainMarkers(w, h);
+  if (mapLayers.drones) drawDroneMarkers(w, h);
+}
+
+function drawMapGrid(w, h) {
+  mapCtx.strokeStyle = 'rgba(42, 48, 64, 0.5)';
+  mapCtx.lineWidth = 1;
+  const gridSize = 100 * mapView.zoom;
+  const offX = (-mapView.offsetX * mapView.zoom) % gridSize;
+  const offY = (-mapView.offsetY * mapView.zoom) % gridSize;
+  for (let x = offX; x < w; x += gridSize) {
+    mapCtx.beginPath(); mapCtx.moveTo(x, 0); mapCtx.lineTo(x, h); mapCtx.stroke();
+  }
+  for (let y = offY; y < h; y += gridSize) {
+    mapCtx.beginPath(); mapCtx.moveTo(0, y); mapCtx.lineTo(w, y); mapCtx.stroke();
+  }
+  // Center crosshair
+  mapCtx.strokeStyle = 'rgba(232, 160, 51, 0.3)';
+  const center = worldToCanvas(0, 0);
+  if (center.x > 0 && center.x < w) {
+    mapCtx.beginPath(); mapCtx.moveTo(center.x, 0); mapCtx.lineTo(center.x, h); mapCtx.stroke();
+  }
+  if (center.y > 0 && center.y < h) {
+    mapCtx.beginPath(); mapCtx.moveTo(0, center.y); mapCtx.lineTo(w, center.y); mapCtx.stroke();
+  }
+}
+
+function drawGeneratorMarkers(w, h) {
+  mapGenerators.forEach(gen => {
+    if (!gen.location) return;
+    const pos = worldToCanvas(gen.location.x, gen.location.y);
+    if (pos.x < -20 || pos.x > w + 20 || pos.y < -20 || pos.y > h + 20) return;
+
+    const isRunning = (gen.RegulatedDemandProd || 0) > 0 || (gen.LoadPercentage || 0) > 0;
+    const hasFuel = (gen.FuelAmount || 0) > 0 || gen.CanStart;
+    let color = isRunning ? '#3dd66f' : (hasFuel ? '#e8a033' : '#e04545');
+
+    const size = Math.max(4, 3 + mapView.zoom * 2);
+    mapCtx.beginPath();
+    mapCtx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+    mapCtx.fillStyle = color;
+    mapCtx.fill();
+    mapCtx.beginPath();
+    mapCtx.arc(pos.x, pos.y, size + 2, 0, Math.PI * 2);
+    mapCtx.strokeStyle = color + '50';
+    mapCtx.lineWidth = 2;
+    mapCtx.stroke();
+
+    gen._mapPos = pos; gen._mapSize = size;
+  });
+}
+
+function drawPlayerMarkers(w, h) {
+  mapPlayers.forEach(player => {
+    if (!player.location) return;
+    const pos = worldToCanvas(player.location.x, player.location.y);
+    if (pos.x < -20 || pos.x > w + 20 || pos.y < -20 || pos.y > h + 20) return;
+
+    const color = player.Online ? '#3b9ddb' : '#6a7088';
+    const size = Math.max(5, 4 + mapView.zoom * 2);
+
+    mapCtx.save();
+    mapCtx.translate(pos.x, pos.y);
+    mapCtx.rotate(Math.PI / 4);
+    mapCtx.fillStyle = color;
+    mapCtx.fillRect(-size/2, -size/2, size, size);
+    mapCtx.restore();
+
+    if (mapView.zoom > 1.5) {
+      const name = player.PlayerName || player.Name || 'Player';
+      mapCtx.font = '10px "Share Tech Mono", monospace';
+      mapCtx.fillStyle = '#d4d8e4';
+      mapCtx.textAlign = 'center';
+      mapCtx.fillText(name, pos.x, pos.y + size + 12);
+    }
+    player._mapPos = pos; player._mapSize = size;
+  });
+}
+
+function drawTrainMarkers(w, h) {
+  mapTrains.forEach(train => {
+    if (!train.location) return;
+    const pos = worldToCanvas(train.location.x, train.location.y);
+    if (pos.x < -20 || pos.x > w + 20 || pos.y < -20 || pos.y > h + 20) return;
+
+    const size = Math.max(5, 4 + mapView.zoom * 2);
+    mapCtx.fillStyle = '#a855f7';
+    mapCtx.fillRect(pos.x - size, pos.y - size/3, size * 2, size * 0.66);
+    train._mapPos = pos; train._mapSize = size;
+  });
+}
+
+function drawDroneMarkers(w, h) {
+  mapDrones.forEach(drone => {
+    if (!drone.location) return;
+    const pos = worldToCanvas(drone.location.x, drone.location.y);
+    if (pos.x < -20 || pos.x > w + 20 || pos.y < -20 || pos.y > h + 20) return;
+
+    const size = Math.max(4, 3 + mapView.zoom * 2);
+    mapCtx.beginPath();
+    mapCtx.moveTo(pos.x, pos.y - size);
+    mapCtx.lineTo(pos.x + size * 0.7, pos.y + size * 0.5);
+    mapCtx.lineTo(pos.x - size * 0.7, pos.y + size * 0.5);
+    mapCtx.closePath();
+    mapCtx.fillStyle = '#e8a033';
+    mapCtx.fill();
+    drone._mapPos = pos; drone._mapSize = size;
+  });
+}
+
+function zoomAt(canvasX, canvasY, factor) {
+  const newZoom = Math.max(mapView.minZoom, Math.min(mapView.maxZoom, mapView.zoom * factor));
+  if (newZoom === mapView.zoom) return;
+
+  const imgX = canvasX / mapView.zoom + mapView.offsetX;
+  const imgY = canvasY / mapView.zoom + mapView.offsetY;
+  mapView.zoom = newZoom;
+  mapView.offsetX = imgX - canvasX / mapView.zoom;
+  mapView.offsetY = imgY - canvasY / mapView.zoom;
+  clampMapView();
+  drawMap();
+}
+
+function clampMapView() {
+  if (!mapCanvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = mapCanvas.width / dpr;
+  const h = mapCanvas.height / dpr;
+  const maxOffX = Math.max(0, mapView.imageSize - w / mapView.zoom);
+  const maxOffY = Math.max(0, mapView.imageSize - h / mapView.zoom);
+  mapView.offsetX = Math.max(0, Math.min(maxOffX, mapView.offsetX));
+  mapView.offsetY = Math.max(0, Math.min(maxOffY, mapView.offsetY));
+}
+
+function mapZoomIn() {
+  if (!mapCanvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = mapCanvas.width / dpr;
+  const h = mapCanvas.height / dpr;
+  zoomAt(w / 2, h / 2, 1.4);
+}
+
+function mapZoomOut() {
+  if (!mapCanvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = mapCanvas.width / dpr;
+  const h = mapCanvas.height / dpr;
+  zoomAt(w / 2, h / 2, 0.7);
+}
+
+function mapReset() {
+  mapView.zoom = 1;
+  centerMap();
+  drawMap();
+}
+
+function showMapPopup(entity, type, x, y) {
+  const popup = document.getElementById('mapPopup');
+  const title = document.getElementById('mapPopupTitle');
+  const content = document.getElementById('mapPopupContent');
+  if (!popup) return;
+
+  if (type === 'generator') {
+    const genType = (entity.ClassName || 'Generator').replace('Build_', '').replace(/_C$/g, '').replace(/([A-Z])/g, ' $1').trim();
+    title.textContent = genType;
+    const prod = entity.RegulatedDemandProd || 0;
+    const base = entity.BaseProd || entity.ProductionCapacity || 0;
+    const fuel = entity.FuelAmount || 0;
+    const status = prod > 0 ? 'Running' : 'Idle';
+    content.innerHTML = `Status: <span style="color:${prod > 0 ? 'var(--green)' : 'var(--red)'}">${status}</span><br>Output: ${prod.toFixed(1)} / ${base.toFixed(1)} MW<br>Fuel: ${fuel.toFixed(0)}`;
+  } else if (type === 'player') {
+    title.textContent = entity.PlayerName || entity.Name || 'Pioneer';
+    const hp = entity.PlayerHP !== undefined ? entity.PlayerHP : 100;
+    const online = entity.Online ? 'Online' : 'Offline';
+    content.innerHTML = `Status: <span style="color:${entity.Online ? 'var(--green)' : 'var(--text-dim)'}">${online}</span><br>Health: ${hp.toFixed(0)}%`;
+  } else if (type === 'train') {
+    title.textContent = entity.TrainName || entity.Name || 'Train';
+    const speed = Math.abs(entity.ForwardSpeed || 0).toFixed(0);
+    const mode = entity.SelfDriving ? 'Auto' : 'Manual';
+    content.innerHTML = `Speed: ${speed} km/h<br>Mode: ${mode}`;
+  } else if (type === 'drone') {
+    title.textContent = 'Drone';
+    const status = entity.DroneStatus || 'Unknown';
+    content.innerHTML = `Status: ${status}<br>Home: ${entity.HomeStation || '—'}`;
+  }
+
+  const container = document.getElementById('mapContainer');
+  const rect = container.getBoundingClientRect();
+  popup.style.left = Math.min(x + 12, rect.width - 160) + 'px';
+  popup.style.top = Math.max(y - 50, 10) + 'px';
+  popup.style.display = 'block';
+}
+
+function hideMapPopup() {
+  const popup = document.getElementById('mapPopup');
+  if (popup) popup.style.display = 'none';
+}
+
+function checkMapMarkerHover(canvasX, canvasY) {
+  if (mapLayers.generators) {
+    for (const gen of mapGenerators) {
+      if (!gen._mapPos) continue;
+      const dist = Math.hypot(canvasX - gen._mapPos.x, canvasY - gen._mapPos.y);
+      if (dist < (gen._mapSize || 8) + 8) {
+        showMapPopup(gen, 'generator', canvasX, canvasY);
+        return true;
+      }
+    }
+  }
+  if (mapLayers.players) {
+    for (const p of mapPlayers) {
+      if (!p._mapPos) continue;
+      const dist = Math.hypot(canvasX - p._mapPos.x, canvasY - p._mapPos.y);
+      if (dist < (p._mapSize || 8) + 8) {
+        showMapPopup(p, 'player', canvasX, canvasY);
+        return true;
+      }
+    }
+  }
+  if (mapLayers.trains) {
+    for (const t of mapTrains) {
+      if (!t._mapPos) continue;
+      const dist = Math.hypot(canvasX - t._mapPos.x, canvasY - t._mapPos.y);
+      if (dist < (t._mapSize || 8) + 8) {
+        showMapPopup(t, 'train', canvasX, canvasY);
+        return true;
+      }
+    }
+  }
+  if (mapLayers.drones) {
+    for (const d of mapDrones) {
+      if (!d._mapPos) continue;
+      const dist = Math.hypot(canvasX - d._mapPos.x, canvasY - d._mapPos.y);
+      if (dist < (d._mapSize || 8) + 8) {
+        showMapPopup(d, 'drone', canvasX, canvasY);
+        return true;
+      }
+    }
+  }
+  hideMapPopup();
+  return false;
+}
+
+// Map event handlers
+if (mapCanvas) {
+  mapCanvas.addEventListener('mousedown', e => {
+    mapDragging = true;
+    mapLastPos = { x: e.clientX, y: e.clientY };
+    mapCanvas.style.cursor = 'grabbing';
+  });
+
+  mapCanvas.addEventListener('mousemove', e => {
+    const rect = mapCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (!mapDragging) {
+      checkMapMarkerHover(x, y);
+      return;
+    }
+
+    const dx = (e.clientX - mapLastPos.x) / mapView.zoom;
+    const dy = (e.clientY - mapLastPos.y) / mapView.zoom;
+    mapView.offsetX -= dx;
+    mapView.offsetY -= dy;
+    mapLastPos = { x: e.clientX, y: e.clientY };
+    clampMapView();
+    drawMap();
+  });
+
+  mapCanvas.addEventListener('mouseup', () => {
+    mapDragging = false;
+    mapCanvas.style.cursor = 'grab';
+  });
+
+  mapCanvas.addEventListener('mouseleave', () => {
+    mapDragging = false;
+    mapCanvas.style.cursor = 'grab';
+    hideMapPopup();
+  });
+
+  mapCanvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = mapCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    zoomAt(x, y, e.deltaY > 0 ? 0.85 : 1.18);
+  }, { passive: false });
+
+  // Touch events
+  mapCanvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      mapDragging = true;
+      mapLastPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else if (e.touches.length === 2) {
+      mapDragging = false;
+      pinchStartDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchStartZoom = mapView.zoom;
+    }
+  }, { passive: false });
+
+  mapCanvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && mapDragging) {
+      const dx = (e.touches[0].clientX - mapLastPos.x) / mapView.zoom;
+      const dy = (e.touches[0].clientY - mapLastPos.y) / mapView.zoom;
+      mapView.offsetX -= dx;
+      mapView.offsetY -= dy;
+      mapLastPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      clampMapView();
+      drawMap();
+    } else if (e.touches.length === 2 && pinchStartDist) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = dist / pinchStartDist;
+      const newZoom = Math.max(mapView.minZoom, Math.min(mapView.maxZoom, pinchStartZoom * scale));
+
+      const rect = mapCanvas.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+
+      const imgX = cx / mapView.zoom + mapView.offsetX;
+      const imgY = cy / mapView.zoom + mapView.offsetY;
+      mapView.zoom = newZoom;
+      mapView.offsetX = imgX - cx / mapView.zoom;
+      mapView.offsetY = imgY - cy / mapView.zoom;
+
+      clampMapView();
+      drawMap();
+    }
+  }, { passive: false });
+
+  mapCanvas.addEventListener('touchend', e => {
+    if (e.touches.length < 2) {
+      pinchStartDist = null;
+      pinchStartZoom = null;
+    }
+    if (e.touches.length === 0) mapDragging = false;
+  });
+}
+
+// Layer toggle buttons
+document.querySelectorAll('.map-layer-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const layer = btn.dataset.layer;
+    if (layer && mapLayers.hasOwnProperty(layer)) {
+      mapLayers[layer] = !mapLayers[layer];
+      btn.classList.toggle('active', mapLayers[layer]);
+      drawMap();
+    }
+  });
+});
+
+// ============================================================
 // TABS
 // ============================================================
 function switchTab(tab) {
@@ -2443,6 +3036,10 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   document.querySelectorAll(`[data-tab="${tab}"]`).forEach(el => el.classList.add('active'));
   if(tab === 'power') setTimeout(resizeCanvas, 50);
+  if(tab === 'map') setTimeout(() => {
+    resizeMapCanvas();
+    if (!mapImageLoaded && !mapImage) loadMapImage();
+  }, 50);
 }
 
 document.querySelectorAll('.nav-item, .desktop-tab').forEach(btn => {
@@ -2616,7 +3213,12 @@ function resizeCanvas() {
   drawGraph();
 }
 
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  if (document.getElementById('tab-map')?.classList.contains('active')) {
+    resizeMapCanvas();
+  }
+});
 
 // Graph hover state
 let hoverX = null;
@@ -2912,6 +3514,17 @@ async function poll() {
     renderSwitches(switches);
     renderChat(chat);
     renderFactory(factory);
+
+    // Cache data for map
+    if (generators && Array.isArray(generators)) mapGenerators = generators;
+    if (players && Array.isArray(players)) mapPlayers = players;
+    if (trains && Array.isArray(trains)) mapTrains = trains;
+    if (drones && Array.isArray(drones)) mapDrones = drones;
+
+    // Redraw map if visible
+    if (document.getElementById('tab-map')?.classList.contains('active')) {
+      drawMap();
+    }
   } catch(e) {
     setConn(false);
   }
