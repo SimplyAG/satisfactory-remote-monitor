@@ -12,6 +12,16 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Satisfactory Remote Monitor</title>
+<!-- OneSignal Push Notifications -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "dc513fb0-d412-4240-913e-649e66c19eae",
+    });
+  });
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap');
 
@@ -1835,6 +1845,14 @@
       <button class="btn-ghost" onclick="testAlert()" style="width:100%; font-size:12px;">
         Test Alert
       </button>
+
+      <div style="border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px;">
+        <h4 style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">Phone Push Notifications</h4>
+        <button class="btn-primary" onclick="subscribeToPush()" id="pushSubscribeBtn" style="width:100%; font-size:13px;">
+          Subscribe to Push Alerts
+        </button>
+        <p id="pushStatus" style="font-size:10px; color:var(--text-dim); text-align:center; margin-top:8px;"></p>
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -2000,6 +2018,19 @@ function triggerAlert(title, body) {
 
   playAlertSound();
   sendBrowserNotification(title, body);
+  sendPushNotification(title, body);
+}
+
+async function sendPushNotification(title, message) {
+  try {
+    await fetch('/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, message })
+    });
+  } catch(e) {
+    console.warn('Push notification failed:', e);
+  }
 }
 
 function updateAlertToggles() {
@@ -2338,6 +2369,7 @@ function openSettings() {
   // Hide cancel button if no server configured yet
   document.getElementById('settingsCancelBtn').style.display = cfg.host ? 'block' : 'none';
   updateAlertToggles();
+  updatePushStatus();
   document.getElementById('settingsModal').classList.add('open');
 }
 
@@ -2367,6 +2399,67 @@ function testAlert() {
   playAlertSound();
   if(alertCfg.notifications && Notification.permission === 'granted') {
     new Notification('Test Alert', { body: 'Alerts are working!', icon: 'icon-192.png' });
+  }
+}
+
+// OneSignal Push Subscription
+async function subscribeToPush() {
+  const btn = document.getElementById('pushSubscribeBtn');
+  const status = document.getElementById('pushStatus');
+
+  if(typeof OneSignal === 'undefined') {
+    status.textContent = 'Push service not loaded. Try refreshing.';
+    status.style.color = 'var(--red)';
+    return;
+  }
+
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Subscribing...';
+
+    // Request permission and subscribe
+    await OneSignal.Slidedown.promptPush();
+
+    // Check subscription status
+    const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
+    if(isSubscribed) {
+      btn.textContent = 'Subscribed!';
+      btn.style.background = 'var(--green)';
+      status.textContent = 'You will receive push alerts on this device.';
+      status.style.color = 'var(--green)';
+    } else {
+      btn.textContent = 'Subscribe to Push Alerts';
+      btn.disabled = false;
+      status.textContent = 'Subscription cancelled or blocked.';
+      status.style.color = 'var(--text-dim)';
+    }
+  } catch(err) {
+    console.error('Push subscription error:', err);
+    btn.textContent = 'Subscribe to Push Alerts';
+    btn.disabled = false;
+    status.textContent = 'Failed to subscribe. Try again.';
+    status.style.color = 'var(--red)';
+  }
+}
+
+// Check push subscription status on settings open
+async function updatePushStatus() {
+  const btn = document.getElementById('pushSubscribeBtn');
+  const status = document.getElementById('pushStatus');
+
+  if(typeof OneSignal === 'undefined' || !btn) return;
+
+  try {
+    const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
+    if(isSubscribed) {
+      btn.textContent = 'Subscribed';
+      btn.style.background = 'var(--green)';
+      btn.disabled = true;
+      status.textContent = 'Receiving push alerts on this device.';
+      status.style.color = 'var(--green)';
+    }
+  } catch(e) {
+    // OneSignal not ready yet, ignore
   }
 }
 

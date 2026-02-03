@@ -12,6 +12,16 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Satisfactory Remote Monitor</title>
+<!-- OneSignal Push Notifications -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "dc513fb0-d412-4240-913e-649e66c19eae",
+    });
+  });
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap');
 
@@ -1120,6 +1130,49 @@
 
   .form-field input:focus { border-color: var(--ficsit-orange); }
 
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .toggle-row input[type="checkbox"] {
+    width: 44px;
+    height: 24px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--surface2);
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle-row input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+
+  .toggle-row input[type="checkbox"]:checked {
+    background: var(--ficsit-orange);
+  }
+
+  .toggle-row input[type="checkbox"]:checked::after {
+    left: 22px;
+    background: var(--bg-deep);
+  }
+
   .modal-actions {
     display: flex;
     gap: 12px;
@@ -1763,6 +1816,45 @@
       <label>Auth Token (if configured)</label>
       <input type="password" id="sToken" placeholder="Leave blank if none" autocapitalize="off" autocorrect="off">
     </div>
+
+    <div style="border-top: 1px solid var(--border); margin: 20px 0; padding-top: 20px;">
+      <h3 style="font-size: 14px; color: var(--text-bright); margin-bottom: 12px;">Alerts</h3>
+
+      <label class="toggle-row">
+        <span>Enable fuse trip alerts</span>
+        <input type="checkbox" id="alertEnabled" onchange="alertCfg.enabled=this.checked; saveAlertCfg(alertCfg);">
+      </label>
+
+      <label class="toggle-row">
+        <span>Play sound</span>
+        <input type="checkbox" id="alertSound" onchange="alertCfg.sound=this.checked; saveAlertCfg(alertCfg);">
+      </label>
+
+      <label class="toggle-row">
+        <span>Browser notifications</span>
+        <input type="checkbox" id="alertNotifications" onchange="toggleNotifications(this)">
+      </label>
+
+      <div class="form-field" style="margin-top:16px; margin-bottom:12px;">
+        <label>Alert when production below (MW)</label>
+        <input type="number" id="alertThreshold" placeholder="e.g. 6000" inputmode="numeric"
+               onchange="alertCfg.prodThreshold=parseFloat(this.value)||0; saveAlertCfg(alertCfg);">
+        <span style="font-size:10px; color:var(--text-dim); display:block; margin-top:4px;">Leave empty or 0 to disable</span>
+      </div>
+
+      <button class="btn-ghost" onclick="testAlert()" style="width:100%; font-size:12px;">
+        Test Alert
+      </button>
+
+      <div style="border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px;">
+        <h4 style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">Phone Push Notifications</h4>
+        <button class="btn-primary" onclick="subscribeToPush()" id="pushSubscribeBtn" style="width:100%; font-size:13px;">
+          Subscribe to Push Alerts
+        </button>
+        <p id="pushStatus" style="font-size:10px; color:var(--text-dim); text-align:center; margin-top:8px;"></p>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-primary" onclick="saveSettings()">Connect</button>
       <button class="btn-ghost" onclick="closeSettings()" id="settingsCancelBtn">Cancel</button>
@@ -1799,6 +1891,160 @@ function saveCfg(c) {
 }
 
 function url() { return `http://${cfg.host}:${cfg.port}`; }
+
+// ============================================================
+// ALERTS SYSTEM
+// ============================================================
+const ALERT_DEFAULTS = { enabled: true, sound: true, notifications: false, prodThreshold: 0 };
+let alertCfg = loadAlertCfg();
+let lastFuseState = false;
+let lastProdBelowThreshold = false;
+let lastAlertTime = 0;
+const ALERT_COOLDOWN = 30000; // 30 seconds between repeat alerts
+
+function loadAlertCfg() {
+  try {
+    const s = localStorage.getItem('frm_alerts');
+    if(s) return {...ALERT_DEFAULTS, ...JSON.parse(s)};
+  } catch(e){}
+  return {...ALERT_DEFAULTS};
+}
+
+function saveAlertCfg(c) {
+  localStorage.setItem('frm_alerts', JSON.stringify(c));
+  alertCfg = c;
+}
+
+// Audio context for alert sound
+let audioCtx = null;
+
+function playAlertSound() {
+  if(!alertCfg.sound) return;
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Create a pleasant alert chime
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+    osc.frequency.setValueAtTime(660, audioCtx.currentTime + 0.1); // E5
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2); // A5
+
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.5);
+  } catch(e) {
+    console.warn('Alert sound failed:', e);
+  }
+}
+
+function sendBrowserNotification(title, body) {
+  if(!alertCfg.notifications) return;
+  if(Notification.permission !== 'granted') return;
+
+  try {
+    new Notification(title, {
+      body: body,
+      icon: 'icon-192.png',
+      tag: 'fuse-alert',
+      requireInteraction: true
+    });
+  } catch(e) {
+    console.warn('Notification failed:', e);
+  }
+}
+
+function requestNotificationPermission() {
+  if(!('Notification' in window)) {
+    alert('Browser notifications are not supported on this device.\n\nOn iPhone, add this app to your home screen first.');
+    return;
+  }
+
+  if(Notification.permission === 'denied') {
+    alert('Notifications are blocked.\n\nTo enable them, go to your browser settings and allow notifications for this site.');
+    return;
+  }
+
+  Notification.requestPermission().then(permission => {
+    if(permission === 'granted') {
+      alertCfg.notifications = true;
+      saveAlertCfg(alertCfg);
+      updateAlertToggles();
+      // Show success
+      new Notification('Notifications Enabled', { body: 'You will receive alerts when power issues occur.', icon: 'icon-192.png' });
+    } else if(permission === 'denied') {
+      alert('Notifications were denied. You can change this in browser settings.');
+    }
+  }).catch(err => {
+    console.error('Notification permission error:', err);
+    alert('Could not request notification permission. Try adding this app to your home screen.');
+  });
+}
+
+
+function checkAlerts(fuseTripped, currentProd) {
+  if(!alertCfg.enabled) {
+    lastFuseState = fuseTripped;
+    lastProdBelowThreshold = false;
+    return;
+  }
+
+  // Fuse trip alert - only on transition from OK to TRIPPED
+  if(fuseTripped && !lastFuseState) {
+    triggerAlert('Power Lost!', 'A circuit fuse has tripped!');
+  }
+  lastFuseState = fuseTripped;
+
+  // Production threshold alert
+  if(alertCfg.prodThreshold > 0 && currentProd > 0) {
+    const belowThreshold = currentProd < alertCfg.prodThreshold;
+    if(belowThreshold && !lastProdBelowThreshold) {
+      triggerAlert('Low Production!', `Power dropped below ${alertCfg.prodThreshold} MW (${currentProd.toFixed(0)} MW)`);
+    }
+    lastProdBelowThreshold = belowThreshold;
+  }
+}
+
+function triggerAlert(title, body) {
+  const now = Date.now();
+  if(now - lastAlertTime < ALERT_COOLDOWN) return;
+  lastAlertTime = now;
+
+  playAlertSound();
+  sendBrowserNotification(title, body);
+  sendPushNotification(title, body);
+}
+
+async function sendPushNotification(title, message) {
+  try {
+    await fetch('/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, message })
+    });
+  } catch(e) {
+    console.warn('Push notification failed:', e);
+  }
+}
+
+function updateAlertToggles() {
+  const enabledToggle = document.getElementById('alertEnabled');
+  const soundToggle = document.getElementById('alertSound');
+  const notifToggle = document.getElementById('alertNotifications');
+
+  if(enabledToggle) enabledToggle.checked = alertCfg.enabled;
+  if(soundToggle) soundToggle.checked = alertCfg.sound;
+  if(notifToggle) {
+    notifToggle.checked = alertCfg.notifications && Notification.permission === 'granted';
+    notifToggle.disabled = Notification.permission === 'denied';
+  }
+}
 
 // ============================================================
 // PIN GATE
@@ -2117,16 +2363,104 @@ function openSettings() {
   document.getElementById('sHost').value = cfg.host;
   document.getElementById('sPort').value = cfg.port;
   document.getElementById('sToken').value = cfg.token;
+  // Update production threshold field
+  const thresholdInput = document.getElementById('alertThreshold');
+  if(thresholdInput) thresholdInput.value = alertCfg.prodThreshold || '';
   // Hide cancel button if no server configured yet
   document.getElementById('settingsCancelBtn').style.display = cfg.host ? 'block' : 'none';
+  updateAlertToggles();
+  updatePushStatus();
   document.getElementById('settingsModal').classList.add('open');
 }
 
 function closeSettings() {
   // Only allow closing if server is configured
-  const cfg = getCfg();
   if(!cfg.host) return; // Can't close without server configured
   document.getElementById('settingsModal').classList.remove('open');
+}
+
+function toggleNotifications(checkbox) {
+  if(checkbox.checked) {
+    if(Notification.permission === 'granted') {
+      alertCfg.notifications = true;
+      saveAlertCfg(alertCfg);
+    } else {
+      checkbox.checked = false;
+      requestNotificationPermission();
+    }
+  } else {
+    alertCfg.notifications = false;
+    saveAlertCfg(alertCfg);
+  }
+}
+
+function testAlert() {
+  lastAlertTime = 0; // Reset cooldown for test
+  playAlertSound();
+  if(alertCfg.notifications && Notification.permission === 'granted') {
+    new Notification('Test Alert', { body: 'Alerts are working!', icon: 'icon-192.png' });
+  }
+}
+
+// OneSignal Push Subscription
+async function subscribeToPush() {
+  const btn = document.getElementById('pushSubscribeBtn');
+  const status = document.getElementById('pushStatus');
+
+  if(typeof OneSignal === 'undefined') {
+    status.textContent = 'Push service not loaded. Try refreshing.';
+    status.style.color = 'var(--red)';
+    return;
+  }
+
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Subscribing...';
+
+    // Request permission and subscribe
+    await OneSignal.Slidedown.promptPush();
+
+    // Check subscription status
+    const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
+    if(isSubscribed) {
+      btn.textContent = 'Subscribed!';
+      btn.style.background = 'var(--green)';
+      status.textContent = 'You will receive push alerts on this device.';
+      status.style.color = 'var(--green)';
+    } else {
+      btn.textContent = 'Subscribe to Push Alerts';
+      btn.disabled = false;
+      status.textContent = 'Subscription cancelled or blocked.';
+      status.style.color = 'var(--text-dim)';
+    }
+  } catch(err) {
+    console.error('Push subscription error:', err);
+    btn.textContent = 'Subscribe to Push Alerts';
+    btn.disabled = false;
+    status.textContent = 'Failed to subscribe. Try again.';
+    status.style.color = 'var(--red)';
+  }
+}
+
+// Check push subscription status on settings open
+async function updatePushStatus() {
+  const btn = document.getElementById('pushSubscribeBtn');
+  const status = document.getElementById('pushStatus');
+
+  if(typeof OneSignal === 'undefined' || !btn) return;
+
+  try {
+    const isSubscribed = await OneSignal.User.PushSubscription.optedIn;
+    if(isSubscribed) {
+      btn.textContent = 'Subscribed';
+      btn.style.background = 'var(--green)';
+      btn.disabled = true;
+      status.textContent = 'Receiving push alerts on this device.';
+      status.style.color = 'var(--green)';
+    }
+  } catch(e) {
+    // OneSignal not ready yet, ignore
+  }
 }
 
 function saveSettings() {
@@ -2173,6 +2507,124 @@ function resizeCanvas() {
 }
 
 window.addEventListener('resize', resizeCanvas);
+
+// Graph hover state
+let hoverX = null;
+let hoverDataIndex = null;
+
+// Graph tooltip element (created dynamically)
+const graphTooltip = document.createElement('div');
+graphTooltip.id = 'graphTooltip';
+graphTooltip.style.cssText = `
+  position: absolute;
+  background: rgba(13, 15, 20, 0.95);
+  border: 1px solid #e8a033;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: #d4d8e4;
+  pointer-events: none;
+  z-index: 100;
+  display: none;
+  min-width: 140px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+`;
+document.body.appendChild(graphTooltip);
+
+function handleGraphHover(clientX, clientY, isTouch) {
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  const pad = { top: 12, right: 12, bottom: 24, left: 50 };
+  const gW = cW - pad.left - pad.right;
+
+  // Check if within graph area
+  if (x < pad.left || x > cW - pad.right || powerHistory.length < 2) {
+    hideGraphTooltip();
+    return;
+  }
+
+  hoverX = x;
+
+  // Calculate which data point we're hovering over
+  const dx = gW / (HISTORY_LEN - 1);
+  const startIdx = HISTORY_LEN - powerHistory.length;
+  const dataIdx = Math.round((x - pad.left) / dx) - startIdx;
+
+  if (dataIdx < 0 || dataIdx >= powerHistory.length) {
+    hideGraphTooltip();
+    return;
+  }
+
+  hoverDataIndex = dataIdx;
+  const data = powerHistory[dataIdx];
+
+  // Update tooltip content
+  const time = new Date(data.time);
+  const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  graphTooltip.innerHTML = `
+    <div style="color:#6a7088;font-size:10px;margin-bottom:4px;">${timeStr}</div>
+    <div style="color:#e8a033;">Prod: ${data.prod.toFixed(1)} MW</div>
+    <div style="color:#3b9ddb;">Cons: ${data.cons.toFixed(1)} MW</div>
+    <div style="color:#d44a4a;">Max: ${data.max.toFixed(1)} MW</div>
+  `;
+
+  // Position tooltip
+  let tooltipX = clientX + 15;
+  let tooltipY = isTouch ? clientY - 100 : clientY - 10;
+
+  // Keep tooltip on screen
+  const tooltipRect = graphTooltip.getBoundingClientRect();
+  if (tooltipX + 160 > window.innerWidth) {
+    tooltipX = clientX - 160;
+  }
+  if (tooltipY < 10) {
+    tooltipY = clientY + 20;
+  }
+
+  graphTooltip.style.left = tooltipX + 'px';
+  graphTooltip.style.top = tooltipY + 'px';
+  graphTooltip.style.display = 'block';
+
+  drawGraph();
+}
+
+function hideGraphTooltip() {
+  hoverX = null;
+  hoverDataIndex = null;
+  graphTooltip.style.display = 'none';
+  drawGraph();
+}
+
+// Desktop mouse events
+canvas.addEventListener('mousemove', (e) => {
+  handleGraphHover(e.clientX, e.clientY, false);
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hideGraphTooltip();
+});
+
+// Mobile touch events
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  handleGraphHover(touch.clientX, touch.clientY, true);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  handleGraphHover(touch.clientX, touch.clientY, true);
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+  // Delay hiding on mobile so user can see the tooltip
+  setTimeout(hideGraphTooltip, 1500);
+});
 
 function drawGraph() {
   ctx.clearRect(0, 0, cW, cH);
@@ -2282,6 +2734,41 @@ function drawGraph() {
     ctx.fillStyle = col;
     ctx.fill();
   });
+
+  // Draw crosshair if hovering
+  if (hoverX !== null && hoverDataIndex !== null && hoverDataIndex >= 0 && hoverDataIndex < powerHistory.length) {
+    const data = powerHistory[hoverDataIndex];
+    const crossX = xPos(startIdx + hoverDataIndex);
+
+    // Vertical line
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(232, 160, 51, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.moveTo(crossX, pad.top);
+    ctx.lineTo(crossX, pad.top + gH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Highlight dots at hover position
+    [[data.prod, '#e8a033'], [data.cons, '#3b9ddb'], [data.max, '#d44a4a']].forEach(([val, col]) => {
+      // Outer glow
+      ctx.beginPath();
+      ctx.arc(crossX, yPos(val), 8, 0, Math.PI * 2);
+      ctx.fillStyle = col.replace(')', ', 0.3)').replace('rgb', 'rgba').replace('#', 'rgba(');
+      ctx.fillStyle = `${col}40`;
+      ctx.fill();
+
+      // Inner dot
+      ctx.beginPath();
+      ctx.arc(crossX, yPos(val), 5, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  }
 }
 
 // ============================================================
@@ -2394,6 +2881,9 @@ function renderPower(data) {
     fuse.className = 'fuse-status ok';
     fuse.innerHTML = '<span>&#9679;</span> OPERATIONAL';
   }
+
+  // Check for alerts (fuse trips and production threshold)
+  checkAlerts(fuseTripped, prod);
 
   // Quick stats
   const qsPower = document.getElementById('qsPower');
