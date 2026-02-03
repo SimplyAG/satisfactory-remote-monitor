@@ -1769,7 +1769,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn-primary" onclick="saveSettings()">Connect</button>
-      <button class="btn-ghost" onclick="closeSettings()">Cancel</button>
+      <button class="btn-ghost" onclick="closeSettings()" id="settingsCancelBtn">Cancel</button>
     </div>
   </div>
 </div>
@@ -2112,10 +2112,15 @@ function openSettings() {
   document.getElementById('sPort').value = cfg.port;
   document.getElementById('sToken').value = cfg.token;
   document.getElementById('sInterval').value = cfg.interval;
+  // Hide cancel button if no server configured yet
+  document.getElementById('settingsCancelBtn').style.display = cfg.host ? 'block' : 'none';
   document.getElementById('settingsModal').classList.add('open');
 }
 
 function closeSettings() {
+  // Only allow closing if server is configured
+  const cfg = getCfg();
+  if(!cfg.host) return; // Can't close without server configured
   document.getElementById('settingsModal').classList.remove('open');
 }
 
@@ -2135,7 +2140,7 @@ function saveSettings() {
     token: document.getElementById('sToken').value.trim(),
     interval: parseFloat(document.getElementById('sInterval').value) || 1
   });
-  closeSettings();
+  document.getElementById('settingsModal').classList.remove('open');
   powerHistory = [];
   startPolling();
 }
