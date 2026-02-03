@@ -1,0 +1,2442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FRM Dashboard">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#e8a033">
+<meta name="msapplication-navbutton-color" content="#e8a033">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Satisfactory Remote Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg-deep: #08090c;
+    --bg: #0d0f14;
+    --surface: #131620;
+    --surface2: #1a1e2a;
+    --surface3: #222736;
+    --border: #2a3040;
+    --border-bright: #3a4258;
+    --text: #d4d8e4;
+    --text-dim: #6a7088;
+    --text-bright: #f0f2f8;
+    --ficsit-orange: #e8a033;
+    --ficsit-orange-dim: rgba(232, 160, 51, 0.12);
+    --ficsit-orange-mid: rgba(232, 160, 51, 0.35);
+    --power-prod: #e8a033;
+    --power-cons: #3b9ddb;
+    --power-cons-dim: rgba(59, 157, 219, 0.25);
+    --power-max: #d44a4a;
+    --green: #3dd66f;
+    --green-dim: rgba(61, 214, 111, 0.12);
+    --red: #e04545;
+    --red-dim: rgba(224, 69, 69, 0.12);
+    --blue: #3b9ddb;
+    --blue-dim: rgba(59, 157, 219, 0.12);
+    --battery: #a855f7;
+    --battery-dim: rgba(168, 85, 247, 0.12);
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+    --safe-left: env(safe-area-inset-left);
+    --safe-right: env(safe-area-inset-right);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html {
+    background: var(--bg-deep);
+    overflow-x: hidden;
+  }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-top: var(--safe-top);
+    padding-bottom: calc(80px + var(--safe-bottom));
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* === HEADER (Mobile-first: compact) === */
+  .header {
+    background: var(--surface);
+    border-bottom: 2px solid var(--ficsit-orange);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 0; right: 0;
+    height: 10px;
+    background: linear-gradient(to bottom, rgba(232, 160, 51, 0.08), transparent);
+    pointer-events: none;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-badge {
+    background: var(--ficsit-orange);
+    color: var(--bg-deep);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 800;
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 4px 10px;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 100%, 6px 100%);
+  }
+
+  .logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .logo-text .highlight { color: var(--ficsit-orange); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .conn-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+  }
+
+  .conn-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: all 0.3s;
+  }
+
+  .conn-dot.on {
+    background: var(--green);
+    box-shadow: 0 0 10px rgba(61, 214, 111, 0.6);
+  }
+
+  .gear-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 38px; height: 38px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gear-btn:hover { border-color: var(--ficsit-orange); color: var(--ficsit-orange); }
+
+  .gear-btn:active { background: var(--surface2); }
+
+  /* === QUICK STATS BAR === */
+  .quick-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .quick-stat {
+    text-align: center;
+    min-width: 0;
+  }
+
+  .quick-stat .val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .quick-stat .lbl {
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .quick-stat.warn .val { color: var(--ficsit-orange); }
+  .quick-stat.danger .val { color: var(--red); }
+  .quick-stat.good .val { color: var(--green); }
+
+  /* === AWESOME SINK === */
+  .sink-display {
+    background: linear-gradient(135deg, var(--surface2) 0%, var(--surface) 100%);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sink-display::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ficsit-orange), var(--green), var(--ficsit-orange));
+    background-size: 200% 100%;
+    animation: sink-glow 3s ease infinite;
+  }
+
+  @keyframes sink-glow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .sink-points {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--ficsit-orange);
+    text-shadow: 0 0 20px rgba(232, 160, 51, 0.4);
+    line-height: 1;
+  }
+
+  .sink-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 6px;
+  }
+
+  .sink-coupons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .coupon-count {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .coupon-icon {
+    width: 28px; height: 28px;
+    background: var(--ficsit-orange);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .coupon-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-bright);
+  }
+
+  .coupon-progress {
+    flex: 1;
+    max-width: 120px;
+  }
+
+  .coupon-bar {
+    height: 8px;
+    background: var(--bg-deep);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .coupon-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--ficsit-orange));
+    transition: width 0.5s ease;
+  }
+
+  .coupon-text {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    text-align: center;
+  }
+
+  /* === GENERATORS === */
+  .gen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .gen-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .gen-card.warning { border-color: var(--ficsit-orange); }
+  .gen-card.critical { border-color: var(--red); animation: gen-pulse 1s infinite; }
+
+  @keyframes gen-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(224, 69, 69, 0.4); }
+    50% { box-shadow: 0 0 10px 2px rgba(224, 69, 69, 0.4); }
+  }
+
+  .gen-type {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .gen-count {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-bright);
+    line-height: 1;
+  }
+
+  .gen-output {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .gen-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    margin-top: 6px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .gen-fuel {
+    margin-top: 10px;
+  }
+
+  .gen-fuel-bar {
+    height: 6px;
+    background: var(--bg-deep);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .gen-fuel-fill {
+    height: 100%;
+    transition: width 0.5s ease, background 0.3s;
+  }
+
+  .gen-fuel-text {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* === POWER SWITCHES === */
+  .switch-grid {
+    display: grid;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .switch-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .switch-item:hover {
+    border-color: var(--border-bright);
+  }
+
+  .switch-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .switch-name {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .switch-type {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .switch-toggle {
+    width: 50px;
+    height: 26px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+
+  .switch-toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+
+  .switch-toggle.on {
+    background: var(--green-dim);
+    border-color: var(--green);
+  }
+
+  .switch-toggle.on::after {
+    left: 27px;
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(61, 214, 111, 0.6);
+  }
+
+  .switch-toggle:active {
+    transform: scale(0.95);
+  }
+
+  /* === CHAT === */
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 350px;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 4px 4px 0 0;
+  }
+
+  .chat-msg {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(42,48,64,0.3);
+  }
+
+  .chat-msg:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .chat-sender {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--ficsit-orange);
+    margin-bottom: 2px;
+  }
+
+  .chat-text {
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .chat-time {
+    font-size: 9px;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    margin-top: 4px;
+  }
+
+  .chat-input-wrap {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+  }
+
+  .chat-input {
+    flex: 1;
+    padding: 10px 12px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    outline: none;
+  }
+
+  .chat-input:focus {
+    border-color: var(--ficsit-orange);
+  }
+
+  .chat-send {
+    padding: 10px 16px;
+    background: var(--ficsit-orange);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: 4px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+
+  .chat-send:active {
+    filter: brightness(0.9);
+  }
+
+  /* === FACTORY STATS === */
+  .factory-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .factory-stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .factory-stat .num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-bright);
+  }
+
+  .factory-stat .lbl {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .factory-stat.good .num { color: var(--green); }
+  .factory-stat.warn .num { color: var(--ficsit-orange); }
+  .factory-stat.bad .num { color: var(--red); }
+
+  /* === MAIN CONTENT === */
+  .content {
+    padding: 12px;
+    padding-bottom: 24px;
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Ensure overview grid items don't break scrolling */
+  .overview-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  /* === CARDS (Mobile-first) === */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.2);
+  }
+
+  .card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .card-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+
+  .card-body { padding: 16px; }
+
+  /* === FUSE STATUS === */
+  .fuse-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    gap: 8px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    border-radius: 3px;
+  }
+
+  .fuse-status.ok {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(61, 214, 111, 0.4);
+  }
+
+  .fuse-status.tripped {
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid rgba(224, 69, 69, 0.4);
+    animation: fuse-pulse 1s infinite;
+  }
+
+  @keyframes fuse-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* === POWER STATS GRID === */
+  .power-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .power-stat {
+    background: var(--surface2);
+    border-radius: 4px;
+    padding: 14px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+
+  .power-stat .value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .power-stat .unit {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .power-stat .label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 6px;
+  }
+
+  .power-stat.production .value { color: var(--power-prod); }
+  .power-stat.consumption .value { color: var(--power-cons); }
+  .power-stat.battery .value { color: var(--battery); }
+
+  /* === CAPACITY BAR === */
+  .capacity-section {
+    margin-top: 16px;
+  }
+
+  .capacity-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+
+  .capacity-label .title {
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .capacity-label .value {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-bright);
+  }
+
+  .capacity-bar {
+    height: 22px;
+    background: var(--bg-deep);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    position: relative;
+  }
+
+  .capacity-fill {
+    height: 100%;
+    transition: width 0.5s ease, background 0.3s;
+    position: relative;
+  }
+
+  .capacity-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 4px,
+      rgba(255,255,255,0.04) 4px,
+      rgba(255,255,255,0.04) 8px
+    );
+  }
+
+  .capacity-text {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+
+  /* === GRAPH === */
+  .graph-container {
+    background: var(--bg-deep);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    margin-top: 16px;
+    overflow: hidden;
+  }
+
+  .graph-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 10px;
+    font-size: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+
+  .graph-canvas-wrap {
+    position: relative;
+    height: 180px;
+  }
+
+  .graph-canvas-wrap canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* === CIRCUIT SELECTOR === */
+  .circuit-selector {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .circuit-btn {
+    padding: 6px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .circuit-btn:active { transform: scale(0.97); }
+  .circuit-btn.active {
+    background: var(--ficsit-orange-dim);
+    border-color: var(--ficsit-orange);
+    color: var(--ficsit-orange);
+  }
+
+  /* === PLAYER LIST === */
+  .player-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(42,48,64,0.5);
+  }
+
+  .player-item:last-child { border-bottom: none; }
+
+  .player-avatar {
+    width: 40px; height: 40px;
+    border-radius: 4px;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ficsit-orange);
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .player-avatar.online {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .player-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .player-name {
+    font-weight: 600;
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .player-status {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .player-hp {
+    width: 50px;
+  }
+
+  .hp-bar {
+    height: 6px;
+    background: var(--bg-deep);
+    border-radius: 2px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .hp-fill {
+    height: 100%;
+    border-radius: 1px;
+    transition: width 0.5s;
+  }
+
+  /* === PRODUCTION TABLE === */
+  .prod-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .prod-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(42,48,64,0.3);
+    font-size: 13px;
+  }
+
+  .prod-item:last-child { border-bottom: none; }
+
+  .prod-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .prod-values {
+    text-align: right;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .prod-in { color: var(--green); }
+  .prod-out { color: var(--power-cons); font-size: 11px; }
+
+  .prod-eff {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    min-width: 45px;
+    text-align: right;
+  }
+
+  /* === TRAIN/DRONE ITEMS === */
+  .transport-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(42,48,64,0.5);
+  }
+
+  .transport-item:last-child { border-bottom: none; }
+
+  .transport-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .transport-status {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .transport-speed {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    color: var(--blue);
+  }
+
+  /* === SESSION INFO === */
+  .session-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(42,48,64,0.3);
+    font-size: 14px;
+  }
+
+  .session-row:last-child { border-bottom: none; }
+
+  .session-row .label { color: var(--text-dim); }
+  .session-row .value { font-family: 'Share Tech Mono', monospace; }
+
+  /* === BOTTOM NAV (Mobile) === */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding-bottom: var(--safe-bottom);
+    z-index: 100;
+  }
+
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: none;
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  .nav-item:active { background: rgba(255,255,255,0.03); }
+
+  .nav-item.active {
+    color: var(--ficsit-orange);
+  }
+
+  .nav-item .icon {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+
+  .nav-item .label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* === EMPTY STATE === */
+  .empty-state {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+  }
+
+  /* === SETTINGS MODAL === */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 200;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border-top: 2px solid var(--ficsit-orange);
+    border-radius: 12px 12px 0 0;
+    padding: 24px 20px;
+    padding-bottom: calc(24px + var(--safe-bottom));
+    width: 100%;
+    max-width: 500px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+
+  .modal h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ficsit-orange);
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  .form-field { margin-bottom: 18px; }
+
+  .form-field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+    font-family: 'Orbitron', sans-serif;
+  }
+
+  .form-field input {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    outline: none;
+    transition: border 0.2s;
+    -webkit-appearance: none;
+  }
+
+  .form-field input:focus { border-color: var(--ficsit-orange); }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .btn-primary {
+    flex: 1;
+    padding: 14px;
+    background: var(--ficsit-orange);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: 4px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+
+  .btn-primary:active { filter: brightness(0.9); }
+
+  .btn-ghost {
+    padding: 14px 20px;
+    background: none;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-ghost:active { background: var(--surface2); }
+
+  /* === SCANLINES === */
+  .scanline {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 999;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.015) 2px,
+      rgba(0, 0, 0, 0.015) 4px
+    );
+  }
+
+  /* === SCROLLBAR === */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* === DESKTOP STYLES === */
+  @media (min-width: 768px) {
+    body {
+      padding-bottom: 24px;
+      overflow-y: auto;
+    }
+
+    .header {
+      padding: 14px 24px;
+    }
+
+    .logo-badge { font-size: 11px; }
+    .logo-text { font-size: 15px; letter-spacing: 3px; }
+
+    .quick-stats {
+      padding: 14px 24px;
+      gap: 16px;
+    }
+
+    .quick-stat .val { font-size: 18px; }
+    .quick-stat .lbl { font-size: 10px; letter-spacing: 1px; }
+
+    .content {
+      padding: 20px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .bottom-nav {
+      display: none;
+    }
+
+    .desktop-tabs {
+      display: flex !important;
+      gap: 0;
+      padding: 0 24px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .desktop-tab {
+      padding: 14px 24px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      background: none;
+      border-left: none;
+      border-right: none;
+      border-top: none;
+    }
+
+    .desktop-tab:hover { color: var(--text); }
+    .desktop-tab.active { color: var(--ficsit-orange); border-bottom-color: var(--ficsit-orange); }
+
+    .power-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+
+    .graph-canvas-wrap { height: 280px; }
+
+    .power-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .modal {
+      border-radius: 6px;
+      max-width: 420px;
+      margin-bottom: 10vh;
+      border: 1px solid var(--ficsit-orange);
+    }
+
+    .modal-overlay {
+      align-items: center;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .desktop-tabs { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-badge">FICSIT</div>
+    <div class="logo-text">F<span class="highlight">R</span>M</div>
+  </div>
+  <div class="header-right">
+    <div class="conn-indicator">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connText">OFFLINE</span>
+    </div>
+    <button class="gear-btn" onclick="openSettings()">&#9881;</button>
+  </div>
+</header>
+
+<!-- QUICK STATS -->
+<div class="quick-stats">
+  <div class="quick-stat" id="qsPower">
+    <div class="val">—</div>
+    <div class="lbl">Power</div>
+  </div>
+  <div class="quick-stat" id="qsCapacity">
+    <div class="val">—</div>
+    <div class="lbl">Load</div>
+  </div>
+  <div class="quick-stat" id="qsSink">
+    <div class="val">—</div>
+    <div class="lbl">Sink Pts</div>
+  </div>
+  <div class="quick-stat" id="qsPlayers">
+    <div class="val">—</div>
+    <div class="lbl">Online</div>
+  </div>
+</div>
+
+<!-- DESKTOP TABS -->
+<div class="desktop-tabs" style="display:none;">
+  <button class="desktop-tab active" data-tab="power">Power</button>
+  <button class="desktop-tab" data-tab="systems">Systems</button>
+  <button class="desktop-tab" data-tab="production">Production</button>
+  <button class="desktop-tab" data-tab="overview">Overview</button>
+</div>
+
+<!-- CONTENT -->
+<main class="content">
+
+  <!-- POWER TAB -->
+  <div class="tab-content active" id="tab-power">
+    <!-- Circuit Selector -->
+    <div class="circuit-selector" id="circuitSelector"></div>
+
+    <!-- Fuse Status -->
+    <div class="fuse-status ok" id="fuseStatus">
+      <span>&#9679;</span> OPERATIONAL
+    </div>
+
+    <div class="power-layout">
+      <div>
+        <!-- Graph Card -->
+        <div class="card" style="margin-top:16px;">
+          <div class="graph-container">
+            <div class="graph-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:var(--power-prod);"></div> Capacity</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--power-cons);"></div> Consumption</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--power-max);"></div> Max</div>
+            </div>
+            <div class="graph-canvas-wrap">
+              <canvas id="powerCanvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Capacity Bar -->
+        <div class="capacity-section">
+          <div class="capacity-label">
+            <span class="title">Grid Load</span>
+            <span class="value" id="capValue">0%</span>
+          </div>
+          <div class="capacity-bar">
+            <div class="capacity-fill" id="capFill" style="width:0%; background:var(--green);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Power Sidebar (desktop) / Stats Grid (mobile) -->
+      <div>
+        <div class="power-grid">
+          <div class="power-stat production">
+            <div class="value" id="pwrProd">0</div>
+            <div class="unit">MW</div>
+            <div class="label">Production</div>
+          </div>
+          <div class="power-stat consumption">
+            <div class="value" id="pwrCons">0</div>
+            <div class="unit">MW</div>
+            <div class="label">Consumption</div>
+          </div>
+          <div class="power-stat battery">
+            <div class="value" id="pwrBatt">0</div>
+            <div class="unit">MWh</div>
+            <div class="label">Battery</div>
+          </div>
+          <div class="power-stat">
+            <div class="value" id="pwrBattPct">0%</div>
+            <div class="label">Charge</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYSTEMS TAB -->
+  <div class="tab-content" id="tab-systems">
+    <div class="overview-grid">
+      <!-- Awesome Sink -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Awesome Sink</div>
+          <div class="card-badge" id="sinkBadge" style="background:var(--ficsit-orange-dim); color:var(--ficsit-orange);">0 coupons</div>
+        </div>
+        <div class="card-body">
+          <div class="sink-display">
+            <div class="sink-points" id="sinkPoints">0</div>
+            <div class="sink-label">Total Points</div>
+            <div class="sink-coupons">
+              <div class="coupon-count">
+                <div class="coupon-icon">🎫</div>
+                <div class="coupon-num" id="couponCount">0</div>
+              </div>
+              <div class="coupon-progress">
+                <div class="coupon-bar">
+                  <div class="coupon-fill" id="couponFill" style="width:0%;"></div>
+                </div>
+                <div class="coupon-text" id="couponText">0% to next</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generators -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Generators</div>
+          <div class="card-badge" id="genBadge" style="background:var(--ficsit-orange-dim); color:var(--ficsit-orange);">0 total</div>
+        </div>
+        <div class="card-body">
+          <div class="gen-grid" id="genGrid">
+            <div class="empty-state">Loading generators...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Power Switches -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Power Switches</div>
+          <div class="card-badge" id="switchBadge" style="background:var(--green-dim); color:var(--green);">0 switches</div>
+        </div>
+        <div class="card-body">
+          <div class="switch-grid" id="switchGrid">
+            <div class="empty-state">No switches found</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Chat</div>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+              <div class="empty-state" style="padding:32px;">No messages</div>
+            </div>
+            <div class="chat-input-wrap">
+              <input type="text" class="chat-input" id="chatInput" placeholder="Type message..." maxlength="200">
+              <button class="chat-send" onclick="sendChat()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCTION TAB -->
+  <div class="tab-content" id="tab-production">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Production</div>
+        <div class="card-badge" id="prodBadge" style="background:var(--ficsit-orange-dim); color:var(--ficsit-orange);">0 items</div>
+      </div>
+      <div class="card-body">
+        <div class="prod-list" id="prodList">
+          <div class="empty-state">Waiting for data...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERVIEW TAB -->
+  <div class="tab-content" id="tab-overview">
+    <div class="overview-grid">
+      <!-- Players -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Players</div>
+          <div class="card-badge" id="playerBadge" style="background:var(--green-dim); color:var(--green);">0 online</div>
+        </div>
+        <div class="card-body" id="playerList">
+          <div class="empty-state">No players</div>
+        </div>
+      </div>
+
+      <!-- Trains -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Trains</div>
+          <div class="card-badge" id="trainBadge" style="background:var(--blue-dim); color:var(--blue);">0</div>
+        </div>
+        <div class="card-body" id="trainList">
+          <div class="empty-state">No trains</div>
+        </div>
+      </div>
+
+      <!-- Drones -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Drones</div>
+          <div class="card-badge" id="droneBadge" style="background:var(--battery-dim); color:var(--battery);">0</div>
+        </div>
+        <div class="card-body" id="droneList">
+          <div class="empty-state">No drones</div>
+        </div>
+      </div>
+
+      <!-- Session -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Session</div>
+        </div>
+        <div class="card-body" id="sessionInfo">
+          <div class="empty-state">Waiting...</div>
+        </div>
+      </div>
+
+      <!-- Factory Stats -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Factory</div>
+          <div class="card-badge" id="factoryBadge" style="background:var(--green-dim); color:var(--green);">—</div>
+        </div>
+        <div class="card-body">
+          <div class="factory-summary" id="factoryStats">
+            <div class="factory-stat">
+              <div class="num" id="factoryTotal">—</div>
+              <div class="lbl">Machines</div>
+            </div>
+            <div class="factory-stat good">
+              <div class="num" id="factoryRunning">—</div>
+              <div class="lbl">Running</div>
+            </div>
+            <div class="factory-stat warn">
+              <div class="num" id="factoryIdle">—</div>
+              <div class="lbl">Idle</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- BOTTOM NAV (Mobile) -->
+<nav class="bottom-nav">
+  <button class="nav-item active" data-tab="power">
+    <span class="icon">&#9889;</span>
+    <span class="label">Power</span>
+  </button>
+  <button class="nav-item" data-tab="systems">
+    <span class="icon">&#9881;</span>
+    <span class="label">Systems</span>
+  </button>
+  <button class="nav-item" data-tab="production">
+    <span class="icon">&#128200;</span>
+    <span class="label">Prod</span>
+  </button>
+  <button class="nav-item" data-tab="overview">
+    <span class="icon">&#127981;</span>
+    <span class="label">Overview</span>
+  </button>
+</nav>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>Server Setup</h2>
+    <p style="color:var(--text-dim); font-size:12px; margin-bottom:20px; text-align:center;">
+      Connect to your Satisfactory server running the <a href="https://ficsit.app/mod/FicsitRemoteMonitoring" target="_blank" style="color:var(--ficsit-orange);">Ficsit Remote Monitoring</a> mod
+    </p>
+    <div class="form-field">
+      <label>Server IP / Hostname</label>
+      <input type="text" id="sHost" placeholder="192.168.1.100 or your-server.com" autocapitalize="off" autocorrect="off">
+    </div>
+    <div class="form-field">
+      <label>FRM Port</label>
+      <input type="text" id="sPort" placeholder="8080" inputmode="numeric">
+    </div>
+    <div class="form-field">
+      <label>Auth Token (if configured)</label>
+      <input type="password" id="sToken" placeholder="Leave blank if none" autocapitalize="off" autocorrect="off">
+    </div>
+    <div class="form-field">
+      <label>Refresh Interval (seconds)</label>
+      <input type="number" id="sInterval" value="1" min="0.25" max="60" step="0.25" inputmode="decimal">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="saveSettings()">Connect</button>
+      <button class="btn-ghost" onclick="closeSettings()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const DEFAULTS = { host:'', port:'8080', token:'', interval:1 };
+let cfg = loadCfg();
+let timer = null;
+let selectedCircuit = 0;
+const HISTORY_LEN = 120;
+let powerHistory = [];
+
+function loadCfg() {
+  try {
+    const s = localStorage.getItem('frm_config');
+    if(s) return {...DEFAULTS, ...JSON.parse(s)};
+  } catch(e){}
+  return {...DEFAULTS};
+}
+
+function isConfigured() {
+  return cfg.host && cfg.host.trim().length > 0;
+}
+
+function saveCfg(c) {
+  localStorage.setItem('frm_config', JSON.stringify(c));
+  cfg = c;
+}
+
+function url() { return `http://${cfg.host}:${cfg.port}`; }
+
+async function api(endpoint) {
+  let u = `${url()}/${endpoint}`;
+  if(cfg.token) u += `?auth=${encodeURIComponent(cfg.token)}`;
+  const r = await fetch(u, { mode: 'cors' });
+  if(!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item, .desktop-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll(`[data-tab="${tab}"]`).forEach(el => el.classList.add('active'));
+  if(tab === 'power') setTimeout(resizeCanvas, 50);
+}
+
+document.querySelectorAll('.nav-item, .desktop-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function openSettings() {
+  document.getElementById('sHost').value = cfg.host;
+  document.getElementById('sPort').value = cfg.port;
+  document.getElementById('sToken').value = cfg.token;
+  document.getElementById('sInterval').value = cfg.interval;
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function saveSettings() {
+  const host = document.getElementById('sHost').value.trim();
+  const port = document.getElementById('sPort').value.trim() || '8080';
+
+  if(!host) {
+    alert('Server IP/hostname is required');
+    document.getElementById('sHost').focus();
+    return;
+  }
+
+  saveCfg({
+    host: host,
+    port: port,
+    token: document.getElementById('sToken').value.trim(),
+    interval: parseFloat(document.getElementById('sInterval').value) || 1
+  });
+  closeSettings();
+  powerHistory = [];
+  startPolling();
+}
+
+document.getElementById('settingsModal').addEventListener('click', e => {
+  if(e.target.id === 'settingsModal') closeSettings();
+});
+
+// ============================================================
+// CANVAS
+// ============================================================
+const canvas = document.getElementById('powerCanvas');
+const ctx = canvas.getContext('2d');
+let cW, cH;
+
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = wrap.clientWidth * dpr;
+  canvas.height = wrap.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+  cW = wrap.clientWidth;
+  cH = wrap.clientHeight;
+  drawGraph();
+}
+
+window.addEventListener('resize', resizeCanvas);
+
+function drawGraph() {
+  ctx.clearRect(0, 0, cW, cH);
+
+  const pad = { top: 12, right: 12, bottom: 24, left: 50 };
+  const gW = cW - pad.left - pad.right;
+  const gH = cH - pad.top - pad.bottom;
+
+  let yMax = 100;
+  powerHistory.forEach(p => {
+    yMax = Math.max(yMax, p.prod * 1.15, p.capacity * 1.15, p.max * 1.15);
+  });
+  yMax = Math.ceil(yMax / 50) * 50;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(42,48,64,0.6)';
+  ctx.lineWidth = 1;
+  for(let i = 0; i <= 4; i++) {
+    const y = pad.top + (gH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + gW, y);
+    ctx.stroke();
+
+    const val = yMax - (yMax / 4) * i;
+    ctx.fillStyle = '#6a7088';
+    ctx.font = '10px "Share Tech Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(0), pad.left - 6, y + 3);
+  }
+
+  if(powerHistory.length < 2) {
+    ctx.fillStyle = '#6a7088';
+    ctx.font = '13px "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Collecting data...', cW / 2, cH / 2);
+    return;
+  }
+
+  const dx = gW / (HISTORY_LEN - 1);
+  const startIdx = HISTORY_LEN - powerHistory.length;
+
+  function yPos(val) { return pad.top + gH - (val / yMax) * gH; }
+  function xPos(i) { return pad.left + i * dx; }
+
+  // Capacity fill
+  ctx.beginPath();
+  ctx.moveTo(xPos(startIdx), yPos(0));
+  powerHistory.forEach((p, i) => ctx.lineTo(xPos(startIdx + i), yPos(p.prod)));
+  ctx.lineTo(xPos(startIdx + powerHistory.length - 1), yPos(0));
+  ctx.closePath();
+  const capGrad = ctx.createLinearGradient(0, pad.top, 0, pad.top + gH);
+  capGrad.addColorStop(0, 'rgba(232,160,51,0.2)');
+  capGrad.addColorStop(1, 'rgba(232,160,51,0.02)');
+  ctx.fillStyle = capGrad;
+  ctx.fill();
+
+  // Capacity line
+  ctx.beginPath();
+  powerHistory.forEach((p, i) => {
+    if(i === 0) ctx.moveTo(xPos(startIdx + i), yPos(p.prod));
+    else ctx.lineTo(xPos(startIdx + i), yPos(p.prod));
+  });
+  ctx.strokeStyle = 'rgba(232,160,51,0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Consumption fill
+  ctx.beginPath();
+  ctx.moveTo(xPos(startIdx), yPos(0));
+  powerHistory.forEach((p, i) => ctx.lineTo(xPos(startIdx + i), yPos(p.cons)));
+  ctx.lineTo(xPos(startIdx + powerHistory.length - 1), yPos(0));
+  ctx.closePath();
+  const consGrad = ctx.createLinearGradient(0, pad.top, 0, pad.top + gH);
+  consGrad.addColorStop(0, 'rgba(59,157,219,0.3)');
+  consGrad.addColorStop(1, 'rgba(59,157,219,0.02)');
+  ctx.fillStyle = consGrad;
+  ctx.fill();
+
+  // Consumption line
+  ctx.beginPath();
+  powerHistory.forEach((p, i) => {
+    if(i === 0) ctx.moveTo(xPos(startIdx + i), yPos(p.cons));
+    else ctx.lineTo(xPos(startIdx + i), yPos(p.cons));
+  });
+  ctx.strokeStyle = 'rgba(59,157,219,0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Max line (dashed)
+  ctx.beginPath();
+  ctx.setLineDash([4, 3]);
+  powerHistory.forEach((p, i) => {
+    if(i === 0) ctx.moveTo(xPos(startIdx + i), yPos(p.max));
+    else ctx.lineTo(xPos(startIdx + i), yPos(p.max));
+  });
+  ctx.strokeStyle = 'rgba(212,74,74,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // End dots
+  const last = powerHistory[powerHistory.length - 1];
+  [[last.prod, '#e8a033'], [last.cons, '#3b9ddb'], [last.max, '#d44a4a']].forEach(([val, col]) => {
+    ctx.beginPath();
+    ctx.arc(xPos(startIdx + powerHistory.length - 1), yPos(val), 4, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+  });
+}
+
+// ============================================================
+// DATA FETCH
+// ============================================================
+async function poll() {
+  try {
+    const [power, players, prodStats, trains, drones, session, sink, generators, switches, chat, factory] = await Promise.all([
+      api('getPower').catch(() => null),
+      api('getPlayer').catch(() => null),
+      api('getProdStats').catch(() => null),
+      api('getTrains').catch(() => null),
+      api('getDrone').catch(() => null),
+      api('getSessionInfo').catch(() => null),
+      api('getResourceSink').catch(() => null),
+      api('getGenerators').catch(() => null),
+      api('getSwitches').catch(() => null),
+      api('getChatMessages').catch(() => null),
+      api('getFactory').catch(() => null),
+    ]);
+
+    setConn(true);
+    renderPower(power);
+    renderPlayers(players);
+    renderProduction(prodStats);
+    renderTrains(trains);
+    renderDrones(drones);
+    renderSession(session);
+    renderSink(sink);
+    renderGenerators(generators);
+    renderSwitches(switches);
+    renderChat(chat);
+    renderFactory(factory);
+  } catch(e) {
+    setConn(false);
+  }
+}
+
+function setConn(ok) {
+  document.getElementById('connDot').className = ok ? 'conn-dot on' : 'conn-dot';
+  document.getElementById('connText').textContent = ok ? 'ONLINE' : 'OFFLINE';
+}
+
+// --- POWER ---
+function renderPower(data) {
+  if(!data || !Array.isArray(data) || data.length === 0) return;
+
+  // Circuit selector
+  const sel = document.getElementById('circuitSelector');
+  if(data.length > 1) {
+    let html = `<button class="circuit-btn ${selectedCircuit === 0 ? 'active' : ''}" onclick="selCircuit(0)">ALL</button>`;
+    data.forEach((_, i) => {
+      html += `<button class="circuit-btn ${selectedCircuit === i + 1 ? 'active' : ''}" onclick="selCircuit(${i + 1})">Circuit ${i + 1}</button>`;
+    });
+    sel.innerHTML = html;
+  } else {
+    sel.innerHTML = '';
+  }
+
+  // Aggregate
+  let prod = 0, cons = 0, max = 0, cap = 0, battCap = 0, battStored = 0, fuseTripped = false;
+
+  if(selectedCircuit === 0) {
+    data.forEach(c => {
+      prod += c.PowerProduction || 0;
+      cons += c.PowerConsumed || 0;
+      max += c.PowerMaxConsumed || 0;
+      cap += c.PowerCapacity || c.PowerProduction || 0;
+      battCap += c.BatteryCapacity || 0;
+      battStored += c.BatteryStored || 0;
+      if(c.FuseTriggered) fuseTripped = true;
+    });
+  } else {
+    const c = data[selectedCircuit - 1] || data[0];
+    prod = c.PowerProduction || 0;
+    cons = c.PowerConsumed || 0;
+    max = c.PowerMaxConsumed || 0;
+    cap = c.PowerCapacity || c.PowerProduction || 0;
+    battCap = c.BatteryCapacity || 0;
+    battStored = c.BatteryStored || 0;
+    fuseTripped = !!c.FuseTriggered;
+  }
+
+  const usage = prod > 0 ? (cons / prod * 100) : 0;
+  const battPct = battCap > 0 ? (battStored / battCap * 100) : 0;
+
+  powerHistory.push({ time: Date.now(), prod, cons, max, capacity: cap });
+  if(powerHistory.length > HISTORY_LEN) powerHistory.shift();
+
+  // Update UI
+  document.getElementById('pwrProd').textContent = prod.toFixed(1);
+  document.getElementById('pwrCons').textContent = cons.toFixed(1);
+  document.getElementById('pwrBatt').textContent = battStored.toFixed(1);
+  document.getElementById('pwrBattPct').textContent = battPct.toFixed(0) + '%';
+
+  const barPct = Math.min(usage, 100);
+  const barCol = usage > 90 ? 'var(--red)' : usage > 70 ? 'var(--ficsit-orange)' : 'var(--green)';
+  document.getElementById('capFill').style.width = barPct + '%';
+  document.getElementById('capFill').style.background = barCol;
+  document.getElementById('capValue').textContent = usage.toFixed(1) + '%';
+
+  // Fuse
+  const fuse = document.getElementById('fuseStatus');
+  if(fuseTripped) {
+    fuse.className = 'fuse-status tripped';
+    fuse.innerHTML = '<span>&#9888;</span> FUSE TRIPPED';
+  } else {
+    fuse.className = 'fuse-status ok';
+    fuse.innerHTML = '<span>&#9679;</span> OPERATIONAL';
+  }
+
+  // Quick stats
+  const qsPower = document.getElementById('qsPower');
+  qsPower.querySelector('.val').textContent = cons.toFixed(0) + ' MW';
+  qsPower.className = 'quick-stat' + (usage > 90 ? ' danger' : usage > 70 ? ' warn' : '');
+
+  const qsCap = document.getElementById('qsCapacity');
+  qsCap.querySelector('.val').textContent = usage.toFixed(0) + '%';
+  qsCap.className = 'quick-stat' + (usage > 90 ? ' danger' : usage > 70 ? ' warn' : ' good');
+
+  drawGraph();
+}
+
+function selCircuit(i) {
+  selectedCircuit = i;
+  powerHistory = [];
+}
+
+// --- PLAYERS ---
+let playerLoggedOnce = false;
+function renderPlayers(data) {
+  if(!data) return;
+  // Debug: log first player ONCE to see field names
+  if(data.length > 0 && !playerLoggedOnce) {
+    console.log('Player data sample (full):', JSON.stringify(data[0], null, 2));
+    playerLoggedOnce = true;
+  }
+  const list = Array.isArray(data) ? data : [];
+  const online = list.filter(p => p.Online);
+
+  document.getElementById('playerBadge').textContent = online.length + ' online';
+  document.getElementById('qsPlayers').querySelector('.val').textContent = online.length;
+
+  if(list.length === 0) {
+    document.getElementById('playerList').innerHTML = '<div class="empty-state">No players</div>';
+    return;
+  }
+
+  const sorted = [...online, ...list.filter(p => !p.Online)];
+  let html = '';
+  sorted.forEach(p => {
+    // Try multiple possible field names from FRM API
+    // Name can be empty string, so check for truthy value
+    const rawName = p.PlayerName || p.Name || p.Username || p.PlayerID || '';
+    const name = rawName.trim() || p.ID?.split('_').pop() || 'Pioneer';
+    const init = name.charAt(0).toUpperCase();
+    const hp = p.PlayerHP !== undefined ? p.PlayerHP : 100;
+    const hpCol = hp > 60 ? 'var(--green)' : hp > 30 ? 'var(--ficsit-orange)' : 'var(--red)';
+    html += `
+      <div class="player-item">
+        <div class="player-avatar ${p.Online ? 'online' : ''}">${init}</div>
+        <div class="player-info">
+          <div class="player-name">${name}</div>
+          <div class="player-status">${p.Online ? 'ONLINE' : 'OFFLINE'}</div>
+        </div>
+        <div class="player-hp">
+          <div class="hp-bar"><div class="hp-fill" style="width:${hp}%; background:${hpCol};"></div></div>
+        </div>
+      </div>`;
+  });
+  document.getElementById('playerList').innerHTML = html;
+}
+
+// --- PRODUCTION ---
+function renderProduction(data) {
+  if(!data || !Array.isArray(data)) return;
+  const active = data.filter(i => (i.CurrentProd || 0) > 0 || (i.CurrentConsumed || 0) > 0);
+  active.sort((a, b) => ((b.CurrentProd || 0) + (b.CurrentConsumed || 0)) - ((a.CurrentProd || 0) + (a.CurrentConsumed || 0)));
+
+  document.getElementById('prodBadge').textContent = active.length + ' items';
+
+  if(active.length === 0) {
+    document.getElementById('prodList').innerHTML = '<div class="empty-state">No production</div>';
+    return;
+  }
+
+  let html = '';
+  active.forEach(item => {
+    const name = item.Name || item.ItemName || '?';
+    const prod = (item.CurrentProd || 0).toFixed(1);
+    const cons = (item.CurrentConsumed || 0).toFixed(1);
+    const eff = parseFloat(cons) > 0 ? ((parseFloat(prod) / parseFloat(cons)) * 100).toFixed(0) : '—';
+    const effCol = eff === '—' ? 'var(--text-dim)' : parseFloat(eff) >= 100 ? 'var(--green)' : parseFloat(eff) >= 50 ? 'var(--ficsit-orange)' : 'var(--red)';
+
+    html += `
+      <div class="prod-item">
+        <span class="prod-name">${name}</span>
+        <div class="prod-values">
+          <div class="prod-in">+${prod}/m</div>
+          <div class="prod-out">-${cons}/m</div>
+        </div>
+        <span class="prod-eff" style="color:${effCol}">${eff === '—' ? '—' : eff + '%'}</span>
+      </div>`;
+  });
+  document.getElementById('prodList').innerHTML = html;
+}
+
+// --- TRAINS ---
+function renderTrains(data) {
+  if(!data || !Array.isArray(data)) return;
+  document.getElementById('trainBadge').textContent = data.length;
+
+  if(data.length === 0) {
+    document.getElementById('trainList').innerHTML = '<div class="empty-state">No trains</div>';
+    return;
+  }
+
+  let html = '';
+  data.forEach(t => {
+    const name = t.TrainName || t.Name || 'Unnamed';
+    const speed = t.ForwardSpeed !== undefined ? Math.abs(t.ForwardSpeed).toFixed(0) : '—';
+    const auto = t.SelfDriving ? 'AUTO' : 'MANUAL';
+    html += `
+      <div class="transport-item">
+        <div>
+          <div class="transport-name">${name}</div>
+          <div class="transport-status">${auto}</div>
+        </div>
+        <div class="transport-speed">${speed} km/h</div>
+      </div>`;
+  });
+  document.getElementById('trainList').innerHTML = html;
+}
+
+// --- DRONES ---
+function renderDrones(data) {
+  if(!data || !Array.isArray(data)) return;
+  document.getElementById('droneBadge').textContent = data.length;
+
+  if(data.length === 0) {
+    document.getElementById('droneList').innerHTML = '<div class="empty-state">No drones</div>';
+    return;
+  }
+
+  let html = '';
+  data.forEach(d => {
+    const home = d.HomeStation || '?';
+    const dest = d.PairedStation || '?';
+    const speed = d.FlyingSpeed !== undefined ? d.FlyingSpeed.toFixed(0) : '—';
+    html += `
+      <div class="transport-item">
+        <div>
+          <div class="transport-name">${home} → ${dest}</div>
+          <div class="transport-status">${d.DroneStatus || '—'}</div>
+        </div>
+        <div class="transport-speed">${speed} km/h</div>
+      </div>`;
+  });
+  document.getElementById('droneList').innerHTML = html;
+}
+
+// --- SESSION ---
+function renderSession(data) {
+  if(!data) return;
+  const s = Array.isArray(data) ? data[0] : data;
+  if(!s) return;
+
+  const fields = [
+    ['Session', s.SessionName || s.sessionName || '—'],
+    ['Players', s.NumConnectedPlayers || s.numConnectedPlayers || '—'],
+    ['Tier', s.TechTier || s.techTier || '—'],
+    ['Phase', s.SchematicTier || s.GamePhase || '—'],
+    ['Play Time', s.TotalGameDuration ? (s.TotalGameDuration / 3600).toFixed(1) + ' hrs' : '—'],
+  ];
+
+  let html = '';
+  fields.forEach(([k, v]) => {
+    html += `<div class="session-row"><span class="label">${k}</span><span class="value">${v}</span></div>`;
+  });
+  document.getElementById('sessionInfo').innerHTML = html;
+}
+
+// --- AWESOME SINK ---
+function renderSink(data) {
+  if(!data) return;
+  const s = Array.isArray(data) ? data[0] : data;
+  if(!s) return;
+
+  const totalPoints = s.TotalPoints || s.totalPoints || 0;
+  const coupons = s.NumCoupon || s.numCoupon || s.Coupons || 0;
+  const progress = s.Percent || s.percent || s.Progress || 0;
+  const pointsToNext = s.PointsToCoupon || s.pointsToCoupon || 0;
+
+  // Format large numbers
+  function formatNum(n) {
+    if(n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if(n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if(n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toFixed(0);
+  }
+
+  document.getElementById('sinkPoints').textContent = formatNum(totalPoints);
+  document.getElementById('couponCount').textContent = coupons;
+  document.getElementById('couponFill').style.width = (progress * 100) + '%';
+  document.getElementById('couponText').textContent = (progress * 100).toFixed(1) + '% to next';
+  document.getElementById('sinkBadge').textContent = coupons + ' coupons';
+
+  // Quick stat
+  document.getElementById('qsSink').querySelector('.val').textContent = formatNum(totalPoints);
+}
+
+// --- GENERATORS ---
+let genLoggedOnce = false;
+function renderGenerators(data) {
+  if(!data || !Array.isArray(data)) return;
+
+  // Debug: log first generator ONCE with full details
+  if(data.length > 0 && !genLoggedOnce) {
+    console.log('Generator data sample (full):', JSON.stringify(data[0], null, 2));
+    genLoggedOnce = true;
+  }
+
+  // Group by type
+  const groups = {};
+  data.forEach(g => {
+    const type = g.ClassName || 'Unknown';
+    const shortType = type.replace('Build_', '').replace('_C', '').replace('Generator', '');
+    if(!groups[shortType]) groups[shortType] = {
+      count: 0,
+      running: 0,
+      idle: 0,
+      output: 0,
+      maxOutput: 0,
+      hasFuel: 0,
+      noFuel: 0,
+      loadPcts: []
+    };
+    groups[shortType].count++;
+
+    // Use actual FRM API field names
+    const currentProd = g.RegulatedDemandProd || 0;
+    const baseProd = g.BaseProd || g.ProductionCapacity || 20;
+    const loadPct = g.LoadPercentage || 0;
+    const hasFuel = g.FuelAmount > 0 || g.CanStart;
+    const isRunning = currentProd > 0 || loadPct > 0 || g.IsFullSpeed;
+
+    if(isRunning) {
+      groups[shortType].running++;
+    } else {
+      groups[shortType].idle++;
+    }
+
+    // Track fuel status
+    if(hasFuel) {
+      groups[shortType].hasFuel++;
+    } else {
+      groups[shortType].noFuel++;
+    }
+
+    groups[shortType].output += currentProd;
+    groups[shortType].maxOutput += baseProd;
+
+    // Track load percentage for efficiency
+    groups[shortType].loadPcts.push(loadPct);
+  });
+
+  // Calculate averages for load/efficiency
+  Object.keys(groups).forEach(type => {
+    const g = groups[type];
+    // Calculate average load percentage (efficiency)
+    if(g.loadPcts.length > 0) {
+      g.avgLoad = g.loadPcts.reduce((a,b) => a+b, 0) / g.loadPcts.length;
+    } else {
+      // Fallback: calculate from output/maxOutput
+      g.avgLoad = g.maxOutput > 0 ? (g.output / g.maxOutput) * 100 : 0;
+    }
+    // Calculate fuel percentage (what % have fuel)
+    g.fuelPct = g.count > 0 ? (g.hasFuel / g.count) * 100 : 0;
+  });
+
+  // Count totals
+  let totalRunning = 0, totalIdle = 0;
+  Object.values(groups).forEach(g => {
+    totalRunning += g.running;
+    totalIdle += g.idle;
+  });
+
+  document.getElementById('genBadge').textContent = `${totalRunning}/${data.length} running`;
+
+  if(Object.keys(groups).length === 0) {
+    document.getElementById('genGrid').innerHTML = '<div class="empty-state">No generators</div>';
+    return;
+  }
+
+  let html = '';
+  Object.entries(groups).forEach(([type, info]) => {
+    const fuelCol = info.fuelPct > 50 ? 'var(--green)' : info.fuelPct > 20 ? 'var(--ficsit-orange)' : 'var(--red)';
+    const effCol = info.avgLoad > 80 ? 'var(--green)' : info.avgLoad > 50 ? 'var(--ficsit-orange)' : 'var(--red)';
+    // Card styling based on issues
+    const cardClass = info.noFuel > 0 && info.fuelPct < 20 ? 'critical' : info.idle > 0 ? 'warning' : '';
+
+    html += `
+      <div class="gen-card ${cardClass}">
+        <div class="gen-type">${type}</div>
+        <div class="gen-count">${info.count}</div>
+        <div class="gen-status">
+          <span style="color:var(--green);">▶ ${info.running}</span>
+          ${info.idle > 0 ? `<span style="color:var(--red);"> ■ ${info.idle}</span>` : ''}
+        </div>
+        <div class="gen-output">${info.output.toFixed(1)} / ${info.maxOutput.toFixed(1)} MW</div>
+        <div class="gen-eff" style="color:${effCol}; font-size:11px; margin-top:4px;">
+          ${info.avgLoad.toFixed(0)}% load
+        </div>
+        ${info.count > 0 ? `
+          <div class="gen-fuel">
+            <div class="gen-fuel-bar">
+              <div class="gen-fuel-fill" style="width:${info.fuelPct}%; background:${fuelCol};"></div>
+            </div>
+            <div class="gen-fuel-text">${info.hasFuel}/${info.count} fueled</div>
+          </div>
+        ` : ''}
+      </div>`;
+  });
+  document.getElementById('genGrid').innerHTML = html;
+}
+
+// --- POWER SWITCHES ---
+let switchData = [];
+function renderSwitches(data) {
+  if(!data || !Array.isArray(data)) return;
+  switchData = data;
+
+  document.getElementById('switchBadge').textContent = data.length + ' switches';
+
+  if(data.length === 0) {
+    document.getElementById('switchGrid').innerHTML = '<div class="empty-state">No switches found</div>';
+    return;
+  }
+
+  let html = '';
+  data.forEach((sw, idx) => {
+    const name = sw.Name || sw.SwitchName || `Switch ${idx + 1}`;
+    const isOn = sw.IsOn || sw.isOn || sw.SwitchState || false;
+    const isPriority = sw.IsPriority || sw.Priority || false;
+    const type = isPriority ? 'PRIORITY' : 'STANDARD';
+
+    html += `
+      <div class="switch-item">
+        <div class="switch-info">
+          <div class="switch-name">${name}</div>
+          <div class="switch-type">${type}</div>
+        </div>
+        <div class="switch-toggle ${isOn ? 'on' : ''}" onclick="toggleSwitch(${idx})" data-idx="${idx}"></div>
+      </div>`;
+  });
+  document.getElementById('switchGrid').innerHTML = html;
+}
+
+async function toggleSwitch(idx) {
+  if(!switchData[idx]) return;
+  const sw = switchData[idx];
+  const newState = !(sw.IsOn || sw.isOn || sw.SwitchState || false);
+
+  try {
+    // Visual feedback
+    const toggle = document.querySelector(`.switch-toggle[data-idx="${idx}"]`);
+    if(toggle) toggle.classList.toggle('on', newState);
+
+    // API call - try different endpoint formats
+    const id = sw.ID || sw.Id || sw.SwitchID || idx;
+    await fetch(`${url()}/setSwitches?auth=${encodeURIComponent(cfg.token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ID: id, IsOn: newState })
+    });
+  } catch(e) {
+    console.error('Failed to toggle switch:', e);
+  }
+}
+
+// --- CHAT ---
+function renderChat(data) {
+  if(!data || !Array.isArray(data)) return;
+
+  if(data.length === 0) {
+    document.getElementById('chatMessages').innerHTML = '<div class="empty-state" style="padding:32px;">No messages</div>';
+    return;
+  }
+
+  // Clean up FRM template variables like <PlayerName/>
+  function cleanMsg(text, sender) {
+    if(!text) return '';
+    return text
+      .replace(/<PlayerName\s*\/>/gi, sender || 'Player') // Replace with actual player name
+      .replace(/<[A-Za-z]+\s*\/>/g, '') // Remove any other empty XML-style tags
+      .trim();
+  }
+
+  // Show newest first
+  const sorted = [...data].reverse();
+  let html = '';
+  sorted.forEach(msg => {
+    const sender = msg.Sender || msg.PlayerName || msg.Name || 'System';
+    const rawText = msg.Message || msg.Text || msg.Content || '';
+    const text = cleanMsg(rawText, sender);
+    const time = msg.Timestamp ? new Date(msg.Timestamp).toLocaleTimeString() : '';
+
+    // Skip empty messages after cleaning
+    if(!text) return;
+
+    html += `
+      <div class="chat-msg">
+        <div class="chat-sender">${escapeHtml(sender)}</div>
+        <div class="chat-text">${escapeHtml(text)}</div>
+        ${time ? `<div class="chat-time">${time}</div>` : ''}
+      </div>`;
+  });
+
+  if(!html) {
+    document.getElementById('chatMessages').innerHTML = '<div class="empty-state" style="padding:32px;">No messages</div>';
+    return;
+  }
+  document.getElementById('chatMessages').innerHTML = html;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if(!msg) return;
+
+  try {
+    await fetch(`${url()}/sendChatMessage?auth=${encodeURIComponent(cfg.token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg })
+    });
+    input.value = '';
+  } catch(e) {
+    console.error('Failed to send chat:', e);
+  }
+}
+
+// Enter key to send chat
+document.addEventListener('DOMContentLoaded', () => {
+  const chatInput = document.getElementById('chatInput');
+  if(chatInput) {
+    chatInput.addEventListener('keypress', e => {
+      if(e.key === 'Enter') sendChat();
+    });
+  }
+});
+
+// --- FACTORY ---
+function renderFactory(data) {
+  if(!data || !Array.isArray(data)) return;
+
+  let total = data.length;
+  let running = 0;
+  let idle = 0;
+
+  data.forEach(m => {
+    const isProducing = m.IsProducing || m.isProducing || m.IsConfigured;
+    const isPaused = m.IsPaused || m.isPaused || m.IsProductionPaused;
+
+    if(isProducing && !isPaused) {
+      running++;
+    } else {
+      idle++;
+    }
+  });
+
+  const efficiency = total > 0 ? ((running / total) * 100).toFixed(0) : 0;
+  const effClass = efficiency >= 80 ? 'good' : efficiency >= 50 ? 'warn' : 'bad';
+
+  document.getElementById('factoryTotal').textContent = total;
+  document.getElementById('factoryRunning').textContent = running;
+  document.getElementById('factoryIdle').textContent = idle;
+  document.getElementById('factoryBadge').textContent = efficiency + '% eff';
+  document.getElementById('factoryBadge').style.background = effClass === 'good' ? 'var(--green-dim)' : effClass === 'warn' ? 'var(--ficsit-orange-dim)' : 'var(--red-dim)';
+  document.getElementById('factoryBadge').style.color = effClass === 'good' ? 'var(--green)' : effClass === 'warn' ? 'var(--ficsit-orange)' : 'var(--red)';
+}
+
+// ============================================================
+// POLLING
+// ============================================================
+function startPolling() {
+  if(timer) clearInterval(timer);
+  poll();
+  timer = setInterval(poll, cfg.interval * 1000);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+setTimeout(resizeCanvas, 100);
+
+// Show setup modal on first run, otherwise start polling
+if(!isConfigured()) {
+  openSettings();
+} else {
+  startPolling();
+}
+
+// Register service worker for PWA (optional)
+if('serviceWorker' in navigator) {
+  // navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
