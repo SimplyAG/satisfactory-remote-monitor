@@ -1120,6 +1120,49 @@
 
   .form-field input:focus { border-color: var(--ficsit-orange); }
 
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .toggle-row input[type="checkbox"] {
+    width: 44px;
+    height: 24px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--surface2);
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle-row input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+
+  .toggle-row input[type="checkbox"]:checked {
+    background: var(--ficsit-orange);
+  }
+
+  .toggle-row input[type="checkbox"]:checked::after {
+    left: 22px;
+    background: var(--bg-deep);
+  }
+
   .modal-actions {
     display: flex;
     gap: 12px;
@@ -1763,6 +1806,37 @@
       <label>Auth Token (if configured)</label>
       <input type="password" id="sToken" placeholder="Leave blank if none" autocapitalize="off" autocorrect="off">
     </div>
+
+    <div style="border-top: 1px solid var(--border); margin: 20px 0; padding-top: 20px;">
+      <h3 style="font-size: 14px; color: var(--text-bright); margin-bottom: 12px;">Alerts</h3>
+
+      <label class="toggle-row">
+        <span>Enable fuse trip alerts</span>
+        <input type="checkbox" id="alertEnabled" onchange="alertCfg.enabled=this.checked; saveAlertCfg(alertCfg);">
+      </label>
+
+      <label class="toggle-row">
+        <span>Play sound</span>
+        <input type="checkbox" id="alertSound" onchange="alertCfg.sound=this.checked; saveAlertCfg(alertCfg);">
+      </label>
+
+      <label class="toggle-row">
+        <span>Browser notifications</span>
+        <input type="checkbox" id="alertNotifications" onchange="toggleNotifications(this)">
+      </label>
+
+      <div class="form-field" style="margin-top:16px; margin-bottom:12px;">
+        <label>Alert when production below (MW)</label>
+        <input type="number" id="alertThreshold" placeholder="e.g. 6000" inputmode="numeric"
+               onchange="alertCfg.prodThreshold=parseFloat(this.value)||0; saveAlertCfg(alertCfg);">
+        <span style="font-size:10px; color:var(--text-dim); display:block; margin-top:4px;">Leave empty or 0 to disable</span>
+      </div>
+
+      <button class="btn-ghost" onclick="testAlert()" style="width:100%; font-size:12px;">
+        Test Alert
+      </button>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-primary" onclick="saveSettings()">Connect</button>
       <button class="btn-ghost" onclick="closeSettings()" id="settingsCancelBtn">Cancel</button>
@@ -1799,6 +1873,135 @@ function saveCfg(c) {
 }
 
 function url() { return `http://${cfg.host}:${cfg.port}`; }
+
+// ============================================================
+// ALERTS SYSTEM
+// ============================================================
+const ALERT_DEFAULTS = { enabled: true, sound: true, notifications: false, prodThreshold: 0 };
+let alertCfg = loadAlertCfg();
+let lastFuseState = false;
+let lastProdBelowThreshold = false;
+let lastAlertTime = 0;
+const ALERT_COOLDOWN = 30000; // 30 seconds between repeat alerts
+
+function loadAlertCfg() {
+  try {
+    const s = localStorage.getItem('frm_alerts');
+    if(s) return {...ALERT_DEFAULTS, ...JSON.parse(s)};
+  } catch(e){}
+  return {...ALERT_DEFAULTS};
+}
+
+function saveAlertCfg(c) {
+  localStorage.setItem('frm_alerts', JSON.stringify(c));
+  alertCfg = c;
+}
+
+// Audio context for alert sound
+let audioCtx = null;
+
+function playAlertSound() {
+  if(!alertCfg.sound) return;
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Create a pleasant alert chime
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+    osc.frequency.setValueAtTime(660, audioCtx.currentTime + 0.1); // E5
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2); // A5
+
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.5);
+  } catch(e) {
+    console.warn('Alert sound failed:', e);
+  }
+}
+
+function sendBrowserNotification(title, body) {
+  if(!alertCfg.notifications) return;
+  if(Notification.permission !== 'granted') return;
+
+  try {
+    new Notification(title, {
+      body: body,
+      icon: 'icon-192.png',
+      tag: 'fuse-alert',
+      requireInteraction: true
+    });
+  } catch(e) {
+    console.warn('Notification failed:', e);
+  }
+}
+
+function requestNotificationPermission() {
+  if(!('Notification' in window)) {
+    alert('Browser notifications not supported');
+    return;
+  }
+
+  Notification.requestPermission().then(permission => {
+    if(permission === 'granted') {
+      alertCfg.notifications = true;
+      saveAlertCfg(alertCfg);
+      updateAlertToggles();
+    }
+  });
+}
+
+
+function checkAlerts(fuseTripped, currentProd) {
+  if(!alertCfg.enabled) {
+    lastFuseState = fuseTripped;
+    lastProdBelowThreshold = false;
+    return;
+  }
+
+  // Fuse trip alert - only on transition from OK to TRIPPED
+  if(fuseTripped && !lastFuseState) {
+    triggerAlert('Power Lost!', 'A circuit fuse has tripped!');
+  }
+  lastFuseState = fuseTripped;
+
+  // Production threshold alert
+  if(alertCfg.prodThreshold > 0 && currentProd > 0) {
+    const belowThreshold = currentProd < alertCfg.prodThreshold;
+    if(belowThreshold && !lastProdBelowThreshold) {
+      triggerAlert('Low Production!', `Power dropped below ${alertCfg.prodThreshold} MW (${currentProd.toFixed(0)} MW)`);
+    }
+    lastProdBelowThreshold = belowThreshold;
+  }
+}
+
+function triggerAlert(title, body) {
+  const now = Date.now();
+  if(now - lastAlertTime < ALERT_COOLDOWN) return;
+  lastAlertTime = now;
+
+  playAlertSound();
+  sendBrowserNotification(title, body);
+}
+
+function updateAlertToggles() {
+  const enabledToggle = document.getElementById('alertEnabled');
+  const soundToggle = document.getElementById('alertSound');
+  const notifToggle = document.getElementById('alertNotifications');
+
+  if(enabledToggle) enabledToggle.checked = alertCfg.enabled;
+  if(soundToggle) soundToggle.checked = alertCfg.sound;
+  if(notifToggle) {
+    notifToggle.checked = alertCfg.notifications && Notification.permission === 'granted';
+    notifToggle.disabled = Notification.permission === 'denied';
+  }
+}
 
 // ============================================================
 // PIN GATE
@@ -2117,16 +2320,42 @@ function openSettings() {
   document.getElementById('sHost').value = cfg.host;
   document.getElementById('sPort').value = cfg.port;
   document.getElementById('sToken').value = cfg.token;
+  // Update production threshold field
+  const thresholdInput = document.getElementById('alertThreshold');
+  if(thresholdInput) thresholdInput.value = alertCfg.prodThreshold || '';
   // Hide cancel button if no server configured yet
   document.getElementById('settingsCancelBtn').style.display = cfg.host ? 'block' : 'none';
+  updateAlertToggles();
   document.getElementById('settingsModal').classList.add('open');
 }
 
 function closeSettings() {
   // Only allow closing if server is configured
-  const cfg = getCfg();
   if(!cfg.host) return; // Can't close without server configured
   document.getElementById('settingsModal').classList.remove('open');
+}
+
+function toggleNotifications(checkbox) {
+  if(checkbox.checked) {
+    if(Notification.permission === 'granted') {
+      alertCfg.notifications = true;
+      saveAlertCfg(alertCfg);
+    } else {
+      checkbox.checked = false;
+      requestNotificationPermission();
+    }
+  } else {
+    alertCfg.notifications = false;
+    saveAlertCfg(alertCfg);
+  }
+}
+
+function testAlert() {
+  lastAlertTime = 0; // Reset cooldown for test
+  playAlertSound();
+  if(alertCfg.notifications && Notification.permission === 'granted') {
+    new Notification('Test Alert', { body: 'Alerts are working!', icon: 'icon-192.png' });
+  }
 }
 
 function saveSettings() {
@@ -2547,6 +2776,9 @@ function renderPower(data) {
     fuse.className = 'fuse-status ok';
     fuse.innerHTML = '<span>&#9679;</span> OPERATIONAL';
   }
+
+  // Check for alerts (fuse trips and production threshold)
+  checkAlerts(fuseTripped, prod);
 
   // Quick stats
   const qsPower = document.getElementById('qsPower');
