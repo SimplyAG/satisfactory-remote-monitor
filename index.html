@@ -1572,6 +1572,33 @@
   </button>
 </nav>
 
+<!-- PIN MODAL -->
+<div class="modal-overlay" id="pinModal">
+  <div class="modal" style="max-width:340px;">
+    <div class="modal-handle"></div>
+    <h2 id="pinTitle">Enter PIN</h2>
+    <p style="color:var(--text-dim); font-size:12px; margin-bottom:20px; text-align:center;" id="pinDesc">
+      Enter the PIN to access this dashboard
+    </p>
+    <div class="form-field">
+      <label>PIN Code</label>
+      <input type="password" id="pinInput" placeholder="••••" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="text-align:center; font-size:24px; letter-spacing:8px;">
+    </div>
+    <div id="pinError" style="color:var(--red); font-size:12px; text-align:center; margin-bottom:12px; display:none;">
+      Incorrect PIN
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="submitPin()" id="pinSubmitBtn">Unlock</button>
+    </div>
+    <div id="pinConfirmWrap" style="margin-top:16px; display:none;">
+      <div class="form-field">
+        <label>Confirm PIN</label>
+        <input type="password" id="pinConfirm" placeholder="••••" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="text-align:center; font-size:24px; letter-spacing:8px;">
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settingsModal">
   <div class="modal">
@@ -1632,6 +1659,160 @@ function saveCfg(c) {
 }
 
 function url() { return `http://${cfg.host}:${cfg.port}`; }
+
+// ============================================================
+// PIN GATE
+// ============================================================
+function hashPin(pin) {
+  // Simple hash for convenience security (not crypto-grade)
+  let hash = 0;
+  for(let i = 0; i < pin.length; i++) {
+    const char = pin.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return 'pin_' + Math.abs(hash).toString(36);
+}
+
+function isPinSet() {
+  return !!localStorage.getItem('frm_pin_hash');
+}
+
+function isUnlocked() {
+  return sessionStorage.getItem('frm_unlocked') === 'true';
+}
+
+function setUnlocked() {
+  sessionStorage.setItem('frm_unlocked', 'true');
+}
+
+function verifyPin(entered) {
+  const stored = localStorage.getItem('frm_pin_hash');
+  return stored === hashPin(entered);
+}
+
+function savePin(pin) {
+  localStorage.setItem('frm_pin_hash', hashPin(pin));
+}
+
+function showPinModal(isCreating) {
+  const modal = document.getElementById('pinModal');
+  const title = document.getElementById('pinTitle');
+  const desc = document.getElementById('pinDesc');
+  const confirmWrap = document.getElementById('pinConfirmWrap');
+  const submitBtn = document.getElementById('pinSubmitBtn');
+  const pinInput = document.getElementById('pinInput');
+  const pinError = document.getElementById('pinError');
+
+  pinInput.value = '';
+  pinError.style.display = 'none';
+
+  if(isCreating) {
+    title.textContent = 'Create PIN';
+    desc.textContent = 'Set a 4-6 digit PIN to protect this dashboard';
+    confirmWrap.style.display = 'block';
+    submitBtn.textContent = 'Set PIN';
+    document.getElementById('pinConfirm').value = '';
+  } else {
+    title.textContent = 'Enter PIN';
+    desc.textContent = 'Enter the PIN to access this dashboard';
+    confirmWrap.style.display = 'none';
+    submitBtn.textContent = 'Unlock';
+  }
+
+  modal.classList.add('open');
+  setTimeout(() => pinInput.focus(), 100);
+}
+
+function closePinModal() {
+  document.getElementById('pinModal').classList.remove('open');
+}
+
+function submitPin() {
+  const pin = document.getElementById('pinInput').value;
+  const pinError = document.getElementById('pinError');
+
+  if(pin.length < 4) {
+    pinError.textContent = 'PIN must be at least 4 digits';
+    pinError.style.display = 'block';
+    return;
+  }
+
+  if(!isPinSet()) {
+    // Creating new PIN
+    const confirm = document.getElementById('pinConfirm').value;
+    if(pin !== confirm) {
+      pinError.textContent = 'PINs do not match';
+      pinError.style.display = 'block';
+      return;
+    }
+    savePin(pin);
+    setUnlocked();
+    closePinModal();
+    initDashboard();
+  } else {
+    // Verifying PIN
+    if(verifyPin(pin)) {
+      setUnlocked();
+      closePinModal();
+      // Clear PIN from URL hash if present
+      if(window.location.hash.includes('pin=')) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      initDashboard();
+    } else {
+      pinError.textContent = 'Incorrect PIN';
+      pinError.style.display = 'block';
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinInput').focus();
+    }
+  }
+}
+
+function checkUrlPin() {
+  // Check for PIN in URL hash: #pin=1234
+  const hash = window.location.hash;
+  if(hash && hash.includes('pin=')) {
+    const match = hash.match(/pin=(\d+)/);
+    if(match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+function initDashboard() {
+  // Show settings if not configured, otherwise start polling
+  if(!isConfigured()) {
+    openSettings();
+  } else {
+    startPolling();
+  }
+}
+
+// Handle Enter key in PIN input
+document.addEventListener('DOMContentLoaded', () => {
+  const pinInput = document.getElementById('pinInput');
+  const pinConfirm = document.getElementById('pinConfirm');
+
+  if(pinInput) {
+    pinInput.addEventListener('keypress', e => {
+      if(e.key === 'Enter') {
+        if(!isPinSet()) {
+          pinConfirm.focus();
+        } else {
+          submitPin();
+        }
+      }
+    });
+  }
+
+  if(pinConfirm) {
+    pinConfirm.addEventListener('keypress', e => {
+      if(e.key === 'Enter') submitPin();
+    });
+  }
+});
 
 async function api(endpoint) {
   let u = `${url()}/${endpoint}`;
@@ -2426,12 +2607,33 @@ function startPolling() {
 // ============================================================
 setTimeout(resizeCanvas, 100);
 
-// Show setup modal on first run, otherwise start polling
-if(!isConfigured()) {
-  openSettings();
-} else {
-  startPolling();
-}
+// PIN Gate Flow
+(function() {
+  // Check for PIN in URL hash
+  const urlPin = checkUrlPin();
+
+  if(!isPinSet()) {
+    // No PIN set - prompt to create one
+    showPinModal(true);
+  } else if(isUnlocked()) {
+    // Already unlocked this session
+    initDashboard();
+  } else if(urlPin) {
+    // PIN in URL - try to auto-unlock
+    if(verifyPin(urlPin)) {
+      setUnlocked();
+      // Clear PIN from URL
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      initDashboard();
+    } else {
+      // Wrong PIN in URL - show modal
+      showPinModal(false);
+    }
+  } else {
+    // PIN set but not unlocked - prompt for PIN
+    showPinModal(false);
+  }
+})();
 
 // Register service worker for PWA (optional)
 if('serviceWorker' in navigator) {
