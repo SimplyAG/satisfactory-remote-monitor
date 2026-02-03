@@ -1227,22 +1227,28 @@
     color: var(--ficsit-orange);
   }
 
-  .pin-dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
+  .pin-digit {
+    width: 44px;
+    height: 52px;
+    border-radius: 8px;
     border: 2px solid var(--border);
-    background: transparent;
-    transition: all 0.2s;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--ficsit-orange);
+    transition: all 0.15s;
   }
 
-  .pin-dot.filled {
-    background: var(--ficsit-orange);
+  .pin-digit.filled {
     border-color: var(--ficsit-orange);
-    box-shadow: 0 0 8px rgba(232, 160, 51, 0.4);
+    box-shadow: 0 0 8px rgba(232, 160, 51, 0.3);
   }
 
-  .pin-dot.error {
+  .pin-digit.error {
     border-color: var(--red);
     animation: shake 0.3s;
   }
@@ -1697,11 +1703,11 @@
       </p>
 
       <!-- PIN Display -->
-      <div id="pinDisplay" style="display:flex; justify-content:center; gap:14px; margin-bottom:20px;">
-        <div class="pin-dot"></div>
-        <div class="pin-dot"></div>
-        <div class="pin-dot"></div>
-        <div class="pin-dot"></div>
+      <div id="pinDisplay" style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;">
+        <div class="pin-digit"></div>
+        <div class="pin-digit"></div>
+        <div class="pin-digit"></div>
+        <div class="pin-digit"></div>
       </div>
 
       <div id="pinError" style="color:var(--red); font-size:12px; text-align:center; margin-bottom:12px; display:none;">
@@ -1833,16 +1839,17 @@ function savePin(pin) {
 }
 
 function updatePinDots() {
-  const dots = document.querySelectorAll('.pin-dot');
-  dots.forEach((dot, i) => {
-    dot.classList.toggle('filled', i < currentPin.length);
-    dot.classList.remove('error');
+  const digits = document.querySelectorAll('.pin-digit');
+  digits.forEach((digit, i) => {
+    digit.textContent = currentPin[i] || '';
+    digit.classList.toggle('filled', i < currentPin.length);
+    digit.classList.remove('error');
   });
 }
 
 function showPinError() {
-  const dots = document.querySelectorAll('.pin-dot');
-  dots.forEach(dot => dot.classList.add('error'));
+  const digits = document.querySelectorAll('.pin-digit');
+  digits.forEach(digit => digit.classList.add('error'));
   document.getElementById('pinError').style.display = 'block';
   setTimeout(() => {
     currentPin = '';
