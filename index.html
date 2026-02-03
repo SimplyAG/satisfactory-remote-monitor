@@ -1879,6 +1879,10 @@ function clearPin() {
   const keypad = document.getElementById('phoneKeypad');
   if (!keypad) return;
 
+  function clearAllPressed() {
+    keypad.querySelectorAll('.key-btn.pressed').forEach(b => b.classList.remove('pressed'));
+  }
+
   function handleKey(btn) {
     const key = btn.dataset.key;
     const action = btn.dataset.action;
@@ -1897,36 +1901,39 @@ function clearPin() {
     const btn = e.target.closest('.key-btn');
     if (!btn) return;
     e.preventDefault();
+    clearAllPressed();
     btn.classList.add('pressed');
     handleKey(btn);
+    // Auto-clear after 150ms as fallback
+    setTimeout(() => btn.classList.remove('pressed'), 150);
   }, { passive: false });
 
-  keypad.addEventListener('touchend', function(e) {
-    const btn = e.target.closest('.key-btn');
-    if (btn) btn.classList.remove('pressed');
+  keypad.addEventListener('touchend', function() {
+    clearAllPressed();
   });
 
-  keypad.addEventListener('touchcancel', function(e) {
-    keypad.querySelectorAll('.key-btn').forEach(b => b.classList.remove('pressed'));
+  keypad.addEventListener('touchcancel', function() {
+    clearAllPressed();
   });
 
   // Mouse fallback for desktop
   keypad.addEventListener('mousedown', function(e) {
-    if ('ontouchstart' in window) return; // Skip on touch devices
-    const btn = e.target.closest('.key-btn');
-    if (!btn) return;
-    btn.classList.add('pressed');
-    handleKey(btn);
-  });
-
-  keypad.addEventListener('mouseup', function(e) {
     if ('ontouchstart' in window) return;
     const btn = e.target.closest('.key-btn');
-    if (btn) btn.classList.remove('pressed');
+    if (!btn) return;
+    clearAllPressed();
+    btn.classList.add('pressed');
+    handleKey(btn);
+    setTimeout(() => btn.classList.remove('pressed'), 150);
+  });
+
+  keypad.addEventListener('mouseup', function() {
+    if ('ontouchstart' in window) return;
+    clearAllPressed();
   });
 
   keypad.addEventListener('mouseleave', function() {
-    keypad.querySelectorAll('.key-btn').forEach(b => b.classList.remove('pressed'));
+    clearAllPressed();
   });
 })();
 
