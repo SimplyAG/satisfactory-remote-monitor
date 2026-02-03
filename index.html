@@ -1685,7 +1685,7 @@
     <div id="pinEntryView" style="display:none;">
       <h2 id="pinTitle">Enter PIN</h2>
       <p style="color:var(--text-dim); font-size:11px; margin-bottom:16px; text-align:center;" id="pinDesc">
-        Use letters or numbers (PAUL = 7285)
+        Use letters or numbers (SLUG = 7584)
       </p>
 
       <!-- PIN Display -->
@@ -1881,7 +1881,7 @@ function setPinMode(mode) {
 
   if(mode === 'create') {
     title.textContent = 'Create PIN';
-    desc.textContent = 'Choose a 4-6 digit PIN (use letters like PAUL = 7285)';
+    desc.textContent = 'Choose a 4-6 digit PIN (use letters like SLUG = 7584)';
     submitBtn.textContent = 'Set PIN';
   } else {
     title.textContent = 'Enter PIN';
@@ -1958,7 +1958,7 @@ function submitPin() {
         isConfirming = false;
         confirmPin = '';
         document.getElementById('pinTitle').textContent = 'Create PIN';
-        document.getElementById('pinDesc').textContent = 'Choose a 4-6 digit PIN (use letters like PAUL = 7285)';
+        document.getElementById('pinDesc').textContent = 'Choose a 4-6 digit PIN (use letters like SLUG = 7584)';
       }
     }
   } else {
@@ -2795,8 +2795,8 @@ setTimeout(resizeCanvas, 100);
   const urlPin = checkUrlPin();
 
   if(!isPinSet()) {
-    // No PIN set - prompt to create one
-    showPinModal(true);
+    // No PIN set - show mode selection
+    showPinModal(false);
   } else if(isUnlocked()) {
     // Already unlocked this session
     initDashboard();
