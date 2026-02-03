@@ -1159,6 +1159,91 @@
 
   .btn-ghost:active { background: var(--surface2); }
 
+  /* === PIN KEYPAD === */
+  .phone-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-width: 280px;
+    margin: 0 auto;
+  }
+
+  .key-btn {
+    aspect-ratio: 1.3;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .key-btn:active {
+    background: var(--ficsit-orange-dim);
+    border-color: var(--ficsit-orange);
+    transform: scale(0.95);
+  }
+
+  .key-btn .key-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-bright);
+    line-height: 1;
+  }
+
+  .key-btn .key-letters {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .key-btn.key-fn {
+    background: var(--bg-deep);
+  }
+
+  .key-btn.key-fn .key-num {
+    font-size: 18px;
+    color: var(--text-dim);
+  }
+
+  .key-btn.key-fn:active .key-num {
+    color: var(--ficsit-orange);
+  }
+
+  .pin-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    transition: all 0.2s;
+  }
+
+  .pin-dot.filled {
+    background: var(--ficsit-orange);
+    border-color: var(--ficsit-orange);
+    box-shadow: 0 0 8px rgba(232, 160, 51, 0.4);
+  }
+
+  .pin-dot.error {
+    border-color: var(--red);
+    animation: shake 0.3s;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+
   /* === SCANLINES === */
   .scanline {
     position: fixed;
@@ -1574,27 +1659,66 @@
 
 <!-- PIN MODAL -->
 <div class="modal-overlay" id="pinModal">
-  <div class="modal" style="max-width:340px;">
+  <div class="modal" style="max-width:340px; padding-bottom: calc(20px + var(--safe-bottom));">
     <div class="modal-handle"></div>
-    <h2 id="pinTitle">Enter PIN</h2>
-    <p style="color:var(--text-dim); font-size:12px; margin-bottom:20px; text-align:center;" id="pinDesc">
-      Enter the PIN to access this dashboard
-    </p>
-    <div class="form-field">
-      <label>PIN Code</label>
-      <input type="password" id="pinInput" placeholder="••••" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="text-align:center; font-size:24px; letter-spacing:8px;">
-    </div>
-    <div id="pinError" style="color:var(--red); font-size:12px; text-align:center; margin-bottom:12px; display:none;">
-      Incorrect PIN
-    </div>
-    <div class="modal-actions">
-      <button class="btn-primary" onclick="submitPin()" id="pinSubmitBtn">Unlock</button>
-    </div>
-    <div id="pinConfirmWrap" style="margin-top:16px; display:none;">
-      <div class="form-field">
-        <label>Confirm PIN</label>
-        <input type="password" id="pinConfirm" placeholder="••••" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="text-align:center; font-size:24px; letter-spacing:8px;">
+
+    <!-- Mode Selection (Create vs Join) -->
+    <div id="pinModeSelect">
+      <h2 style="margin-bottom:8px;">Welcome</h2>
+      <p style="color:var(--text-dim); font-size:12px; margin-bottom:24px; text-align:center;">
+        Are you setting up this dashboard or joining an existing one?
+      </p>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <button class="btn-primary" onclick="setPinMode('create')" style="padding:16px;">
+          Create Server
+          <span style="display:block; font-size:10px; opacity:0.7; font-family:'Rajdhani',sans-serif; letter-spacing:0;">I'm the server owner</span>
+        </button>
+        <button class="btn-ghost" onclick="setPinMode('join')" style="padding:16px; flex:1;">
+          Join Server
+          <span style="display:block; font-size:10px; opacity:0.7;">I have a PIN from a friend</span>
+        </button>
       </div>
+    </div>
+
+    <!-- PIN Entry -->
+    <div id="pinEntryView" style="display:none;">
+      <h2 id="pinTitle">Enter PIN</h2>
+      <p style="color:var(--text-dim); font-size:11px; margin-bottom:16px; text-align:center;" id="pinDesc">
+        Use letters or numbers (PAUL = 7285)
+      </p>
+
+      <!-- PIN Display -->
+      <div id="pinDisplay" style="display:flex; justify-content:center; gap:8px; margin-bottom:20px;">
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
+        <div class="pin-dot"></div>
+      </div>
+
+      <div id="pinError" style="color:var(--red); font-size:12px; text-align:center; margin-bottom:12px; display:none;">
+        Incorrect PIN
+      </div>
+
+      <!-- Phone Keypad -->
+      <div class="phone-keypad">
+        <button class="key-btn" onclick="pressKey('1')"><span class="key-num">1</span><span class="key-letters">&nbsp;</span></button>
+        <button class="key-btn" onclick="pressKey('2')"><span class="key-num">2</span><span class="key-letters">ABC</span></button>
+        <button class="key-btn" onclick="pressKey('3')"><span class="key-num">3</span><span class="key-letters">DEF</span></button>
+        <button class="key-btn" onclick="pressKey('4')"><span class="key-num">4</span><span class="key-letters">GHI</span></button>
+        <button class="key-btn" onclick="pressKey('5')"><span class="key-num">5</span><span class="key-letters">JKL</span></button>
+        <button class="key-btn" onclick="pressKey('6')"><span class="key-num">6</span><span class="key-letters">MNO</span></button>
+        <button class="key-btn" onclick="pressKey('7')"><span class="key-num">7</span><span class="key-letters">PQRS</span></button>
+        <button class="key-btn" onclick="pressKey('8')"><span class="key-num">8</span><span class="key-letters">TUV</span></button>
+        <button class="key-btn" onclick="pressKey('9')"><span class="key-num">9</span><span class="key-letters">WXYZ</span></button>
+        <button class="key-btn key-fn" onclick="clearPin()"><span class="key-num">C</span><span class="key-letters">CLEAR</span></button>
+        <button class="key-btn" onclick="pressKey('0')"><span class="key-num">0</span><span class="key-letters">&nbsp;</span></button>
+        <button class="key-btn key-fn" onclick="backspace()"><span class="key-num">&#9003;</span><span class="key-letters">DEL</span></button>
+      </div>
+
+      <button class="btn-primary" onclick="submitPin()" id="pinSubmitBtn" style="width:100%; margin-top:16px;">Unlock</button>
+      <button class="btn-ghost" onclick="showModeSelect()" style="width:100%; margin-top:8px; font-size:12px;">Back</button>
     </div>
   </div>
 </div>
@@ -1663,13 +1787,18 @@ function url() { return `http://${cfg.host}:${cfg.port}`; }
 // ============================================================
 // PIN GATE
 // ============================================================
+let currentPin = '';
+let pinMode = 'join'; // 'create' or 'join'
+let confirmPin = '';
+let isConfirming = false;
+
 function hashPin(pin) {
   // Simple hash for convenience security (not crypto-grade)
   let hash = 0;
   for(let i = 0; i < pin.length; i++) {
     const char = pin.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return 'pin_' + Math.abs(hash).toString(36);
 }
@@ -1693,35 +1822,106 @@ function verifyPin(entered) {
 
 function savePin(pin) {
   localStorage.setItem('frm_pin_hash', hashPin(pin));
+  localStorage.setItem('frm_is_owner', pinMode === 'create' ? 'true' : 'false');
 }
 
-function showPinModal(isCreating) {
-  const modal = document.getElementById('pinModal');
+function updatePinDots() {
+  const dots = document.querySelectorAll('.pin-dot');
+  dots.forEach((dot, i) => {
+    dot.classList.toggle('filled', i < currentPin.length);
+    dot.classList.remove('error');
+  });
+}
+
+function showPinError() {
+  const dots = document.querySelectorAll('.pin-dot');
+  dots.forEach(dot => dot.classList.add('error'));
+  document.getElementById('pinError').style.display = 'block';
+  setTimeout(() => {
+    currentPin = '';
+    updatePinDots();
+    document.getElementById('pinError').style.display = 'none';
+  }, 1000);
+}
+
+function pressKey(num) {
+  if(currentPin.length >= 6) return;
+  currentPin += num;
+  updatePinDots();
+  document.getElementById('pinError').style.display = 'none';
+
+  // Auto-submit at 4+ digits after a short delay (for 4-digit PINs)
+  // Or wait for manual submit for 5-6 digit PINs
+}
+
+function backspace() {
+  if(currentPin.length > 0) {
+    currentPin = currentPin.slice(0, -1);
+    updatePinDots();
+  }
+}
+
+function clearPin() {
+  currentPin = '';
+  updatePinDots();
+  document.getElementById('pinError').style.display = 'none';
+}
+
+function setPinMode(mode) {
+  pinMode = mode;
+  currentPin = '';
+  confirmPin = '';
+  isConfirming = false;
+
+  document.getElementById('pinModeSelect').style.display = 'none';
+  document.getElementById('pinEntryView').style.display = 'block';
+
   const title = document.getElementById('pinTitle');
   const desc = document.getElementById('pinDesc');
-  const confirmWrap = document.getElementById('pinConfirmWrap');
   const submitBtn = document.getElementById('pinSubmitBtn');
-  const pinInput = document.getElementById('pinInput');
-  const pinError = document.getElementById('pinError');
 
-  pinInput.value = '';
-  pinError.style.display = 'none';
-
-  if(isCreating) {
+  if(mode === 'create') {
     title.textContent = 'Create PIN';
-    desc.textContent = 'Set a 4-6 digit PIN to protect this dashboard';
-    confirmWrap.style.display = 'block';
+    desc.textContent = 'Choose a 4-6 digit PIN (use letters like PAUL = 7285)';
     submitBtn.textContent = 'Set PIN';
-    document.getElementById('pinConfirm').value = '';
   } else {
     title.textContent = 'Enter PIN';
     desc.textContent = 'Enter the PIN to access this dashboard';
-    confirmWrap.style.display = 'none';
     submitBtn.textContent = 'Unlock';
   }
 
+  updatePinDots();
+}
+
+function showModeSelect() {
+  document.getElementById('pinModeSelect').style.display = 'block';
+  document.getElementById('pinEntryView').style.display = 'none';
+  currentPin = '';
+  confirmPin = '';
+  isConfirming = false;
+}
+
+function showPinModal(skipModeSelect) {
+  const modal = document.getElementById('pinModal');
+  currentPin = '';
+  updatePinDots();
+  document.getElementById('pinError').style.display = 'none';
+
+  if(skipModeSelect || isPinSet()) {
+    // PIN exists - go straight to entry
+    document.getElementById('pinModeSelect').style.display = 'none';
+    document.getElementById('pinEntryView').style.display = 'block';
+    document.getElementById('pinTitle').textContent = 'Enter PIN';
+    document.getElementById('pinDesc').textContent = 'Enter the PIN to access this dashboard';
+    document.getElementById('pinSubmitBtn').textContent = 'Unlock';
+    pinMode = 'join';
+  } else {
+    // No PIN - show mode selection
+    document.getElementById('pinModeSelect').style.display = 'block';
+    document.getElementById('pinEntryView').style.display = 'none';
+  }
+
   modal.classList.add('open');
-  setTimeout(() => pinInput.focus(), 100);
 }
 
 function closePinModal() {
@@ -1729,48 +1929,56 @@ function closePinModal() {
 }
 
 function submitPin() {
-  const pin = document.getElementById('pinInput').value;
   const pinError = document.getElementById('pinError');
 
-  if(pin.length < 4) {
+  if(currentPin.length < 4) {
     pinError.textContent = 'PIN must be at least 4 digits';
     pinError.style.display = 'block';
     return;
   }
 
-  if(!isPinSet()) {
-    // Creating new PIN
-    const confirm = document.getElementById('pinConfirm').value;
-    if(pin !== confirm) {
-      pinError.textContent = 'PINs do not match';
-      pinError.style.display = 'block';
-      return;
+  if(pinMode === 'create') {
+    if(!isConfirming) {
+      // First entry - store and ask for confirmation
+      confirmPin = currentPin;
+      currentPin = '';
+      isConfirming = true;
+      document.getElementById('pinTitle').textContent = 'Confirm PIN';
+      document.getElementById('pinDesc').textContent = 'Enter the same PIN again to confirm';
+      updatePinDots();
+    } else {
+      // Confirming
+      if(currentPin === confirmPin) {
+        savePin(currentPin);
+        setUnlocked();
+        closePinModal();
+        initDashboard();
+      } else {
+        pinError.textContent = 'PINs do not match';
+        showPinError();
+        isConfirming = false;
+        confirmPin = '';
+        document.getElementById('pinTitle').textContent = 'Create PIN';
+        document.getElementById('pinDesc').textContent = 'Choose a 4-6 digit PIN (use letters like PAUL = 7285)';
+      }
     }
-    savePin(pin);
-    setUnlocked();
-    closePinModal();
-    initDashboard();
   } else {
-    // Verifying PIN
-    if(verifyPin(pin)) {
+    // Join mode - verify PIN
+    if(verifyPin(currentPin)) {
       setUnlocked();
       closePinModal();
-      // Clear PIN from URL hash if present
       if(window.location.hash.includes('pin=')) {
         history.replaceState(null, '', window.location.pathname + window.location.search);
       }
       initDashboard();
     } else {
       pinError.textContent = 'Incorrect PIN';
-      pinError.style.display = 'block';
-      document.getElementById('pinInput').value = '';
-      document.getElementById('pinInput').focus();
+      showPinError();
     }
   }
 }
 
 function checkUrlPin() {
-  // Check for PIN in URL hash: #pin=1234
   const hash = window.location.hash;
   if(hash && hash.includes('pin=')) {
     const match = hash.match(/pin=(\d+)/);
@@ -1782,37 +1990,12 @@ function checkUrlPin() {
 }
 
 function initDashboard() {
-  // Show settings if not configured, otherwise start polling
   if(!isConfigured()) {
     openSettings();
   } else {
     startPolling();
   }
 }
-
-// Handle Enter key in PIN input
-document.addEventListener('DOMContentLoaded', () => {
-  const pinInput = document.getElementById('pinInput');
-  const pinConfirm = document.getElementById('pinConfirm');
-
-  if(pinInput) {
-    pinInput.addEventListener('keypress', e => {
-      if(e.key === 'Enter') {
-        if(!isPinSet()) {
-          pinConfirm.focus();
-        } else {
-          submitPin();
-        }
-      }
-    });
-  }
-
-  if(pinConfirm) {
-    pinConfirm.addEventListener('keypress', e => {
-      if(e.key === 'Enter') submitPin();
-    });
-  }
-});
 
 async function api(endpoint) {
   let u = `${url()}/${endpoint}`;
