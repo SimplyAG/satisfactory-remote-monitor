@@ -2264,7 +2264,10 @@ function closePinModal() {
   document.getElementById('pinModal').classList.remove('open');
 }
 
-function submitPin() {
+// Store entered PIN for use when saving config
+let enteredPin = '';
+
+async function submitPin() {
   const pinError = document.getElementById('pinError');
 
   if(currentPin.length < 4) {
@@ -2283,12 +2286,14 @@ function submitPin() {
       document.getElementById('pinDesc').textContent = 'Enter the same PIN again to confirm';
       updatePinDots();
     } else {
-      // Confirming
+      // Confirming - PIN matches, save locally and go to settings
       if(currentPin === confirmPin) {
+        enteredPin = currentPin;
         savePin(currentPin);
         setUnlocked();
         closePinModal();
-        initDashboard();
+        // Go to settings to enter server details (will save to server on submit)
+        openSettings();
       } else {
         pinError.textContent = 'PINs do not match';
         showPinError();
@@ -2299,25 +2304,42 @@ function submitPin() {
       }
     }
   } else {
-    // Join mode - save PIN locally (each device stores the shared PIN)
-    // If no PIN exists on this device, save it. If one exists, verify it matches.
-    if(!isPinSet()) {
-      // First time on this device - save the PIN they entered
-      savePin(currentPin);
-      setUnlocked();
-      closePinModal();
-      initDashboard();
-    } else if(verifyPin(currentPin)) {
-      // PIN exists and matches
-      setUnlocked();
-      closePinModal();
-      if(window.location.hash.includes('pin=')) {
-        history.replaceState(null, '', window.location.pathname + window.location.search);
+    // Join mode - fetch config from server using PIN
+    enteredPin = currentPin;
+
+    try {
+      document.getElementById('pinSubmitBtn').textContent = 'Loading...';
+      document.getElementById('pinSubmitBtn').disabled = true;
+
+      const response = await fetch(`/api/config?pin=${encodeURIComponent(currentPin)}`);
+      const data = await response.json();
+
+      if(!response.ok || data.error) {
+        pinError.textContent = data.error || 'Invalid PIN';
+        pinError.style.display = 'block';
+        document.getElementById('pinSubmitBtn').textContent = 'Unlock';
+        document.getElementById('pinSubmitBtn').disabled = false;
+        return;
       }
-      initDashboard();
-    } else {
-      pinError.textContent = 'Incorrect PIN';
-      showPinError();
+
+      // Config found! Save locally and proceed
+      savePin(currentPin);
+      saveCfg({
+        host: data.host,
+        port: data.port || '8080',
+        token: data.token || '',
+        interval: 0.25
+      });
+      setUnlocked();
+      closePinModal();
+      startPolling();
+
+    } catch(err) {
+      console.error('Error fetching config:', err);
+      pinError.textContent = 'Connection error. Try again.';
+      pinError.style.display = 'block';
+      document.getElementById('pinSubmitBtn').textContent = 'Unlock';
+      document.getElementById('pinSubmitBtn').disabled = false;
     }
   }
 }
@@ -2534,9 +2556,10 @@ async function updatePushStatus() {
   }
 }
 
-function saveSettings() {
+async function saveSettings() {
   const host = document.getElementById('sHost').value.trim();
   const port = document.getElementById('sPort').value.trim() || '8080';
+  const token = document.getElementById('sToken').value.trim();
 
   if(!host) {
     alert('Server IP/hostname is required');
@@ -2544,12 +2567,28 @@ function saveSettings() {
     return;
   }
 
+  // Save locally
   saveCfg({
     host: host,
     port: port,
-    token: document.getElementById('sToken').value.trim(),
+    token: token,
     interval: 0.25
   });
+
+  // Save to server if we have a PIN (for sharing with others)
+  if(enteredPin) {
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: enteredPin, host, port, token })
+      });
+    } catch(err) {
+      console.warn('Failed to save config to server:', err);
+      // Continue anyway - local config is saved
+    }
+  }
+
   document.getElementById('settingsModal').classList.remove('open');
   powerHistory = [];
   startPolling();
