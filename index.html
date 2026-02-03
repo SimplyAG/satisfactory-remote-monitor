@@ -2336,7 +2336,7 @@ function setConn(ok, errorType) {
     if(!window.httpsWarningShown) {
       window.httpsWarningShown = true;
       setTimeout(() => {
-        alert('⚠️ Connection Blocked\\n\\nThis HTTPS site cannot connect to your HTTP game server (browser security).\\n\\nTo fix this:\\n1. Download index.html from GitHub\\n2. Open it directly in your browser\\n3. Or run a local web server');
+        alert('Connection Blocked\n\nThis HTTPS site cannot connect to your HTTP game server (browser security).\n\nTo fix this:\n1. Download index.html from GitHub\n2. Open it directly in your browser\n3. Or run a local web server');
       }, 500);
     }
   } else {
