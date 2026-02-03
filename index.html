@@ -1853,6 +1853,16 @@
         </button>
         <p id="pushStatus" style="font-size:10px; color:var(--text-dim); text-align:center; margin-top:8px;"></p>
       </div>
+
+      <div style="border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px;">
+        <h4 style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">Share With Friends</h4>
+        <button class="btn-ghost" onclick="shareSetup()" style="width:100%; font-size:13px;">
+          Copy Share Link
+        </button>
+        <p style="font-size:10px; color:var(--text-dim); text-align:center; margin-top:8px;">
+          Share link includes server config. Tell friends the PIN separately.
+        </p>
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -2321,6 +2331,59 @@ function checkUrlPin() {
     }
   }
   return null;
+}
+
+function checkUrlConfig() {
+  const hash = window.location.hash;
+  if(!hash) return false;
+
+  const params = new URLSearchParams(hash.substring(1));
+  const host = params.get('host');
+  const port = params.get('port') || '8080';
+  const token = params.get('token') || '';
+  const pin = params.get('pin');
+
+  if(host) {
+    // Save server config from URL
+    saveCfg({ host, port, token, interval: 0.25 });
+
+    // Save PIN from URL if provided and not already set
+    if(pin && !isPinSet()) {
+      savePin(pin);
+    }
+
+    // Clear URL hash after saving (keep it clean)
+    history.replaceState(null, '', window.location.pathname);
+    return true;
+  }
+  return false;
+}
+
+function generateShareUrl(includePin) {
+  const base = window.location.origin + window.location.pathname;
+
+  let hash = `#host=${encodeURIComponent(cfg.host)}&port=${encodeURIComponent(cfg.port)}`;
+  if(cfg.token) hash += `&token=${encodeURIComponent(cfg.token)}`;
+  if(includePin) hash += `&pin=${encodeURIComponent(includePin)}`;
+
+  return base + hash;
+}
+
+function shareSetup() {
+  if(!cfg.host) {
+    alert('Set up your server first!');
+    return;
+  }
+
+  const pin = prompt('Enter your PIN to include in the share link (or leave empty):');
+  const url = generateShareUrl(pin);
+
+  navigator.clipboard.writeText(url).then(() => {
+    alert('Link copied!\n\nShare this with friends. ' + (pin ? 'PIN is included in the link.' : 'Tell them the PIN separately.'));
+  }).catch(() => {
+    // Fallback for older browsers
+    prompt('Copy this link:', url);
+  });
 }
 
 function initDashboard() {
@@ -3386,6 +3449,10 @@ setTimeout(resizeCanvas, 100);
 
 // PIN Gate Flow
 (function() {
+  // First check if URL has full config (host, port, etc)
+  // This allows sharing a complete setup URL
+  const hasUrlConfig = checkUrlConfig();
+
   // Check for PIN in URL hash
   const urlPin = checkUrlPin();
 
@@ -3400,6 +3467,12 @@ setTimeout(resizeCanvas, 100);
     if(verifyPin(urlPin)) {
       setUnlocked();
       // Clear PIN from URL
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      initDashboard();
+    } else if(!isPinSet()) {
+      // No PIN set yet - save this one (joining with URL)
+      savePin(urlPin);
+      setUnlocked();
       history.replaceState(null, '', window.location.pathname + window.location.search);
       initDashboard();
     } else {
