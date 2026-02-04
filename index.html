@@ -2580,7 +2580,7 @@ const WORLD_BOUNDS = { minX: -400000, maxX: 400000, minY: -400000, maxY: 400000 
 // Map view state
 const mapView = {
   offsetX: 0, offsetY: 0,
-  zoom: 1, minZoom: 0.3, maxZoom: 5,
+  zoom: 0.4, minZoom: 0.2, maxZoom: 5,
   imageSize: 4096
 };
 
@@ -2853,7 +2853,7 @@ function mapZoomOut() {
 }
 
 function mapReset() {
-  mapView.zoom = 1;
+  mapView.zoom = 0.4;
   centerMap();
   drawMap();
 }
