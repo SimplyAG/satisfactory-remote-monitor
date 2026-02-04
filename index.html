@@ -2602,19 +2602,53 @@ let pinchStartZoom = null;
 function loadMapImage() {
   mapImage = new Image();
   mapImage.crossOrigin = 'anonymous';
+
+  // Use proxy when on HTTPS to avoid mixed content block
+  const useProxy = window.location.protocol === 'https:' &&
+                   !cfg.host.includes('localhost') &&
+                   !cfg.host.includes('127.0.0.1');
+
+  const frmMapUrl = `${url()}/map/map.avif`;
+  const proxiedFrmUrl = useProxy
+    ? `/api/proxy?url=${encodeURIComponent(frmMapUrl)}`
+    : frmMapUrl;
+
+  // Fallback sources in priority order
+  const mapSources = [
+    proxiedFrmUrl,  // FRM server's map (proxied if on HTTPS)
+    'https://raw.githubusercontent.com/porisius/FicsitRemoteMonitoring/main/www/map/map.avif',
+    'https://satisfactory.wiki.gg/images/Map.jpg'
+  ];
+
+  let currentSourceIndex = 0;
+
+  const tryNextSource = () => {
+    if (currentSourceIndex >= mapSources.length) {
+      console.warn('All map sources failed, using grid fallback');
+      mapImageLoaded = false;
+      drawMap();
+      return;
+    }
+
+    console.log(`Trying map source ${currentSourceIndex + 1}: ${mapSources[currentSourceIndex]}`);
+    mapImage.src = mapSources[currentSourceIndex];
+    currentSourceIndex++;
+  };
+
   mapImage.onload = () => {
+    console.log('Map loaded from:', mapImage.src);
     mapImageLoaded = true;
     mapView.imageSize = mapImage.width || 4096;
     centerMap();
     drawMap();
   };
+
   mapImage.onerror = () => {
-    console.warn('Map image failed to load, using grid');
-    mapImageLoaded = false;
-    drawMap();
+    console.warn('Map source failed:', mapImage.src);
+    tryNextSource();
   };
-  // Use Satisfactory wiki map or fallback to grid
-  mapImage.src = 'https://static.wikia.nocookie.net/satisfactory_gamepedia_en/images/7/77/Map.png/revision/latest?cb=20230530153510';
+
+  tryNextSource();
 }
 
 function worldToCanvas(worldX, worldY) {

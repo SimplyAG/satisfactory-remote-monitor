@@ -14,11 +14,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing url parameter' });
   }
 
-  // Security: Only allow FRM API endpoints
+  // Security: Only allow FRM API endpoints and map images
   // Valid endpoints: /getPower, /getPlayer, /getTrains, /sendChatMessage, etc.
   const validEndpoint = /\/(get|send)[A-Za-z]+(\?.*)?$/.test(url);
-  if (!validEndpoint) {
-    return res.status(403).json({ error: 'Invalid endpoint - only FRM API calls allowed' });
+  const validMapImage = /\/map\/map\.(avif|png|jpg)$/i.test(url);
+  if (!validEndpoint && !validMapImage) {
+    return res.status(403).json({ error: 'Invalid endpoint - only FRM API calls and map images allowed' });
   }
 
   // Security: Block obviously malicious URLs
@@ -43,6 +44,15 @@ export default async function handler(req, res) {
         error: 'Upstream error',
         status: response.status
       });
+    }
+
+    // Handle binary image data for map images
+    if (validMapImage) {
+      const contentType = response.headers.get('content-type') || 'image/avif';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24h
+      const buffer = await response.arrayBuffer();
+      return res.send(Buffer.from(buffer));
     }
 
     const data = await response.json();
